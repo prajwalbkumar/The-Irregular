@@ -589,8 +589,14 @@ body.cursor-on #pickbox{display:block}
 .cv-contact-line{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;margin-top:.5rem}
 .cv-contact-line a{color:var(--acc);border-bottom:1px solid rgba(var(--acc-rgb),.3)}
 @media (max-width:900px){
-  .travel-grid,.cv-grid{grid-template-columns:1fr}
+  /* minmax(0,1fr), not 1fr — a bare 1fr track still won't shrink below its
+     content's min-content width (grid/flex items default to min-width:auto),
+     which is exactly what was blowing out .flight-stats' 4 non-wrapping
+     items into page-wide horizontal overflow on narrow phones. */
+  .travel-grid,.cv-grid{grid-template-columns:minmax(0,1fr)}
   .tg-left{position:static}
+  .flight-stats{flex-wrap:wrap;row-gap:.8rem}
+  .fs-item{flex:1 1 40%}
 }
 .map-legend{
   display:flex;flex-wrap:wrap;gap:.4rem;margin-top:1.1rem;

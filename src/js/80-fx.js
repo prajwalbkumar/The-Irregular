@@ -71,7 +71,14 @@ if (localStorage.getItem('fieldbooted') || REDUCED) {
       localStorage.setItem('fieldbooted', '1');
       boot.classList.add('done'); heroScramble();
     }
-    function clickGate() { enterGate({ key: 'Enter' }); }
+    function clickGate(e) {
+      // Without this, a touchend here can still fire a browser-synthesized
+      // "ghost" click on whatever is underneath once #boot's pointer-events
+      // flips to none — landing a tap on the lead card and opening a random
+      // post right as the field appears.
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      enterGate({ key: 'Enter' });
+    }
     addEventListener('keydown', enterGate);
     if (gate) { gate.addEventListener('click', clickGate); gate.addEventListener('touchend', clickGate); }
   }, gateDelay);
