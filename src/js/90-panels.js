@@ -1,18 +1,22 @@
 /* ═══ PANELS: Now Playing / Reading / Streak ═══════════ */
 (function () {
-  /* Now Playing — Last.fm or DATA fallback */
+  /* Now Playing — Spotify (via the /api/nowplaying proxy, see README) or DATA fallback.
+     Not cached: "now playing" is only meaningful fresh, and this fetches once per
+     page load anyway. */
   async function loadMusic() {
     const te = document.getElementById('np-title'), ae = document.getElementById('np-artist');
     if (!te) return;
-    if (DATA.lastfmUser) {
-      try {
-        const r = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${DATA.lastfmUser}&api_key=YOUR_API_KEY&format=json&limit=1`);
+    try {
+      const r = await fetch('/api/nowplaying');
+      if (r.ok) {
         const j = await r.json();
-        const t = j.recenttracks.track[0];
-        te.textContent = t.name; ae.textContent = t.artist['#text'].toUpperCase();
-        return;
-      } catch {}
-    }
+        if (j && j.title) {
+          te.textContent = j.title;
+          ae.textContent = (j.artist + (j.isPlaying ? '' : ' · LAST PLAYED')).toUpperCase();
+          return;
+        }
+      }
+    } catch {}
     if (DATA.nowPlaying.title) {
       te.textContent = DATA.nowPlaying.title;
       ae.textContent = (DATA.nowPlaying.artist + ' · ' + DATA.nowPlaying.genre).toUpperCase();

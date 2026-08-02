@@ -94,8 +94,9 @@ module.exports = {
 
   // Flow panels — authored inline here, HTML strings allowed.
   hobbies: '<span class="fg">DJing</span> — Friday nights, controller and a room. <span class="fg">Aviation</span> — flight tracking, spotting, knowing the registration before the livery resolves. <span class="fg">Photography</span> — see section 03. <span class="fg">The gym</span> — five days, non-negotiable.',
+  // Static fallback for Now Playing — used when /api/nowplaying (Spotify
+  // proxy, see README) isn't configured or the fetch fails.
   nowPlaying: { title: '', artist: '', genre: '' },
-  lastfmUser: '',
   reading: { title: 'Thinking in Systems', author: 'Donella H. Meadows', page: 142, total: 218 },
   challenge: { name: '75 HARD', day: 34, total: 75, startDate: '2026.06.08', active: true },
   bucket: [

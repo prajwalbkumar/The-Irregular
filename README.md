@@ -26,9 +26,10 @@ is described here with the exact file and key to touch.
 8. [Publishing, routing & URLs](#publishing-routing--urls)
 9. [JS module architecture](#js-module-architecture)
 10. [Command line reference](#command-line-reference)
-11. [Testing](#testing)
-12. [Deploy](#deploy)
-13. [Caveats](#caveats)
+11. [Spotify Now Playing](#spotify-now-playing)
+12. [Testing](#testing)
+13. [Deploy](#deploy)
+14. [Caveats](#caveats)
 
 ---
 
@@ -83,7 +84,7 @@ and just run `npm install` once, then the same `npm run dev`/`build`/`test`.
 | `api.open-meteo.com` | Topbar temperature | Shows `—°C`; cached 1h |
 | `aviationweather.gov` | The `metar` command | Command prints an error |
 | `dummyjson.com/quotes` | The live WIRE quote card | Falls back to a 5-quote baked archive |
-| `ws.audioscrobbler.com` (Last.fm) | Now Playing panel, only if `lastfmUser` is set | Falls back to `config.nowPlaying`, then "SILENCE" |
+| `api.spotify.com` (via `/api/nowplaying`, our own proxy) | Now Playing panel — currently playing, or last played if nothing's active | Falls back to `config.nowPlaying`, then "SILENCE". See [Spotify Now Playing](#spotify-now-playing) |
 | `picsum.photos` | Photo placeholders when `photos.yml` has no real `src` | — |
 
 Nothing above is required for `npm run dev`/`build`/`test` to work — the site
@@ -98,6 +99,10 @@ field.config.js              masthead & standing info — see full reference bel
 eleventy.config.js           Eleventy config: collections, filters, shortcodes
 cli.js                       the `npx create-field-broadsheet` scaffolder
 package.json                 scripts + dependencies
+vercel.json                  tells Vercel to build with `npm run build`, serve `dist/`
+api/
+  nowplaying.js               Spotify proxy — see Spotify Now Playing
+.env.example                 the three SPOTIFY_* env vars the proxy needs (copy to .env.local)
 
 src/
   index.njk                  the field — assembles collections into DOM + client-side data
@@ -167,7 +172,7 @@ dist/                         build output (gitignored) — index.html + posts/*
 | Change the site's SEO title/description/domain | `field.config.js` → `site` (title, tagline, description, url — `url` feeds canonical links, the sitemap, and JSON-LD, so set it before deploying) |
 | Add social links | `field.config.js` → `social` (empty strings are omitted automatically from the Person JSON-LD's `sameAs`) |
 | Change the OG image / Twitter card type | `field.config.js` → `seo` |
-| Enable live Now Playing | Set `field.config.js` → `lastfmUser` and add a Last.fm API key where the fetch happens in `src/js/90-panels.js` (see [Caveats](#caveats)) |
+| Enable live Now Playing | Set up the Spotify proxy — see [Spotify Now Playing](#spotify-now-playing) |
 
 ---
 
@@ -187,8 +192,7 @@ Every key the site reads, in one file, grouped as they appear:
 | `projects` | `[{st, name}]` | The "Projects · Tracked" panel (`st` is `active`/`shipped`/`paused`/`shelved`) |
 | `about` / `now` | HTML strings | The two pinned panels above the dispatch flow |
 | `hobbies` | HTML string | The Hobbies panel |
-| `nowPlaying` | `{title, artist, genre}` | Now Playing panel fallback (used when `lastfmUser` is empty or the fetch fails) |
-| `lastfmUser` | string | Last.fm username for a live Now Playing (needs an API key — see Caveats) |
+| `nowPlaying` | `{title, artist, genre}` | Now Playing panel fallback (used when the Spotify proxy isn't configured or its fetch fails) |
 | `reading` | `{title, author, page, total}` | Currently Reading panel + progress bar |
 | `challenge` | `{name, day, total, startDate, active}` | Challenge/streak panel + progress bar |
 | `bucket` | `[{text, done}]` | Bucket List panel |
@@ -317,6 +321,78 @@ This set is deliberately trimmed — don't re-bloat it:
 
 ---
 
+## Spotify Now Playing
+
+The Now Playing panel can show your real currently-playing (or last-played)
+Spotify track. Unlike Last.fm, Spotify has no endpoint you can call directly
+from the browser with just an API key — "what's playing" requires OAuth, and
+the token refresh needs a Client Secret that must never reach client-side JS.
+So this is a small serverless proxy (`api/nowplaying.js`, written for Vercel)
+that holds your credentials server-side and returns just
+`{isPlaying, title, artist, album, image}` to the page. `src/js/90-panels.js`
+fetches `/api/nowplaying` first and only falls back to `field.config.js` →
+`nowPlaying` (then "SILENCE") if that proxy isn't deployed or configured — so
+skipping this section entirely is fine, nothing breaks.
+
+### One-time setup
+
+**1. Register a Spotify app.** Go to the
+[Spotify Developer Dashboard](https://developer.spotify.com/dashboard), log in,
+click **Create app**. Any name/description is fine. Under **Redirect URIs**,
+add:
+```
+http://127.0.0.1:8888/callback
+```
+Save, then open **Settings** on the new app to copy the **Client ID** and
+**Client Secret**.
+
+**2. Authorize it as yourself (one-time, in a browser).** Paste your Client ID
+into this URL and visit it:
+```
+https://accounts.spotify.com/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=http://127.0.0.1:8888/callback&scope=user-read-currently-playing%20user-read-recently-played
+```
+Log in and click **Agree**. The browser will try to load
+`http://127.0.0.1:8888/callback?code=...` and fail to connect (nothing's
+running there) — that's fine, the `code` you need is right there in the address
+bar. Copy everything after `code=`.
+
+**3. Exchange that code for a refresh token** (one-time, in a terminal — do
+this quickly, the code expires in ~60 seconds):
+```bash
+curl -X POST https://accounts.spotify.com/api/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d grant_type=authorization_code \
+  -d code=THE_CODE_FROM_STEP_2 \
+  -d redirect_uri=http://127.0.0.1:8888/callback \
+  -d client_id=YOUR_CLIENT_ID \
+  -d client_secret=YOUR_CLIENT_SECRET
+```
+The JSON response includes a `refresh_token` — save it, this is the long-lived
+credential the proxy uses from now on (the `access_token` in that same
+response expires in an hour and isn't needed again; the proxy fetches its own
+fresh one per request).
+
+**4. Set three environment variables** in your Vercel project (Settings →
+Environment Variables), or in `.env.local` for local testing with `vercel dev`
+(copy `.env.example` — it's gitignored):
+```
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_CLIENT_SECRET=...
+SPOTIFY_REFRESH_TOKEN=...
+```
+
+That's it — redeploy, and the panel starts showing real data. `npm run dev`
+(plain `eleventy --serve`) has no serverless runtime, so `/api/nowplaying` will
+404 locally unless you run `vercel dev` instead; either way the panel falls
+back gracefully, so this never blocks local development.
+
+**Using Cloudflare Pages instead?** The same logic ports to a Pages Function
+(`functions/nowplaying.js`, `onRequest(context)` instead of `(req, res)`,
+`context.env` instead of `process.env`) — ask if you want that version built
+out instead of or alongside the Vercel one.
+
+---
+
 ## Testing
 
 ```bash
@@ -347,8 +423,8 @@ compiled output, not the source.
 
 | Host | Build command | Output dir | Node | Notes |
 |---|---|---|---|---|
-| Cloudflare Pages | `npm run build` | `dist` | 20 | Simplest option; add a `GITHUB_TOKEN` env var only if you want richer activity stats than the public rate limit allows |
-| Vercel | `npm run build` | `dist` | 20 | Can also host a small serverless function to proxy Last.fm (keeps the API key off the client) |
+| Vercel | `npm run build` | `dist` (`vercel.json` sets this) | 20 | Also deploys `api/nowplaying.js` as a serverless function — needed for live Spotify (see above) |
+| Cloudflare Pages | `npm run build` | `dist` | 20 | Simplest for a pure static deploy; the Spotify proxy would need porting to a Pages Function first (see note above) |
 
 Before going live:
 
@@ -358,17 +434,18 @@ Before going live:
 3. If you want GitHub activity beyond the public API's rate limit, add a
    `GITHUB_TOKEN`-backed proxy in front of the `api.github.com` calls in
    `src/js/50-activity.js`.
-4. If you want live Now Playing, get a Last.fm API key and either put it
-   directly in `src/js/90-panels.js` (fine for a personal site) or proxy it
-   through a serverless function (hides the key).
+4. If you want live Now Playing, set up the three `SPOTIFY_*` env vars — see
+   [Spotify Now Playing](#spotify-now-playing).
 
 ---
 
 ## Caveats
 
-1. **Last.fm** needs an API key. `field.config.js`'s `lastfmUser` is blank by
-   default, so the Now Playing panel falls back to `config.nowPlaying`, then
-   "SILENCE" — inert until you add a key (see Deploy above).
+1. **Spotify Now Playing** needs a one-time OAuth setup (see
+   [Spotify Now Playing](#spotify-now-playing)) and a host that runs
+   `api/nowplaying.js` as a serverless function (Vercel, out of the box). Until
+   configured, the panel falls back to `field.config.js` → `nowPlaying`, then
+   "SILENCE" — nothing breaks if you skip it.
 2. **Photos** render from `photos.yml`'s `src` if you set one; otherwise they
    fall back to a picsum.photos placeholder seeded from `s`.
 3. **GitHub activity** (Personnel File) reads the public Events API, which only
