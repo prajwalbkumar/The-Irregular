@@ -1,0 +1,36 @@
+# The compositor's stone — ordered dispatch column for #sec-flow.
+# Mirrors the prototype's FLOW array exactly (posts/briefs/quotes/panels
+# interleaved). The lead post (num 001) is NOT listed here — it renders
+# separately into #lead-slot. Posts tagged `travel` are also excluded here —
+# they route to the Travel feed instead. `ref` for post = frontmatter `id`;
+# for brief/quote = the content file's `order`/filename number (1-based);
+# for panel = the PANELS key.
+- { type: post, ref: p02 }
+- { type: brief, ref: 1 }
+- { type: post, ref: p06 }
+- { type: quote, ref: 2 }
+- { type: post, ref: p07 }
+- { type: brief, ref: 2 }
+- { type: post, ref: p04 }
+- { type: panel, ref: projects }
+- { type: post, ref: p08 }
+- { type: brief, ref: 3 }
+- { type: quote, ref: 1 }
+- { type: post, ref: p10 }
+- { type: brief, ref: 4 }
+- { type: panel, ref: hobbies }
+- { type: panel, ref: nowplaying }
+- { type: panel, ref: currentread }
+- { type: panel, ref: streak }
+- { type: post, ref: p11 }
+- { type: post, ref: p12 }
+- { type: quote, ref: 3 }
+- { type: brief, ref: 6 }
+- { type: panel, ref: bucket }
+- { type: post, ref: p14 }
+- { type: brief, ref: 7 }
+- { type: post, ref: p15 }
+- { type: panel, ref: toys }
+- { type: panel, ref: contact }
+- { type: post, ref: p16 }
+- { type: brief, ref: 8 }

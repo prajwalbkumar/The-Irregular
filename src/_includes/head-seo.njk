@@ -1,0 +1,68 @@
+{#- Full SEO set for every page (§14.1) — resolved from config.site/social and,
+    when included from a standalone post, the post's own frontmatter
+    (title/excerpt/date/tag/size/id are all in scope via the layout's data cascade). -#}
+{% set isPost = tag and id %}
+{% set pageTitle = title or config.site.title %}
+{% set pageDesc = excerpt or config.site.description %}
+{% set pageUrl = (config.site.url + page.url) %}
+{% set pageImage = config.seo.ogImage | absUrl %}
+{% set pageType = "article" if isPost else "website" %}
+<title>{% if pageTitle != config.site.title %}{{ pageTitle }} — {{ config.site.title }}{% else %}{{ config.site.title }}{% endif %}</title>
+<meta name="description" content="{{ pageDesc }}">
+<link rel="canonical" href="{{ pageUrl }}">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="{{ pageType }}">
+<meta property="og:title" content="{{ pageTitle }}">
+<meta property="og:description" content="{{ pageDesc }}">
+<meta property="og:url" content="{{ pageUrl }}">
+<meta property="og:image" content="{{ pageImage }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="{{ config.site.title }}">
+<meta name="twitter:card" content="{{ config.seo.twitterCard }}">
+<meta name="twitter:title" content="{{ pageTitle }}">
+<meta name="twitter:description" content="{{ pageDesc }}">
+<meta name="twitter:image" content="{{ pageImage }}">
+{% if isPost %}
+<meta property="article:published_time" content="{{ date | isoDate }}">
+<meta property="article:section" content="{{ tag | capitalize }}">
+{% endif %}
+<script type="application/ld+json">
+{% if isPost %}
+{
+  "@context": "https://schema.org",
+  "@type": "{{ 'Article' if size == 'lg' else 'BlogPosting' }}",
+  "headline": {{ title | dump | safe }},
+  "description": {{ excerpt | dump | safe }},
+  "datePublished": "{{ date | isoDate }}",
+  "dateModified": "{{ date | isoDate }}",
+  "author": { "@id": "{{ config.site.url }}/#person" },
+  "publisher": { "@id": "{{ config.site.url }}/#person" },
+  "articleSection": {{ tag | dump | safe }},
+  "mainEntityOfPage": "{{ pageUrl }}"
+}
+{% else %}
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "{{ config.site.url }}/#website",
+      "url": "{{ config.site.url }}/",
+      "name": "{{ config.site.title }}",
+      "description": {{ config.site.description | dump | safe }},
+      "publisher": { "@id": "{{ config.site.url }}/#person" }
+    },
+    {
+      "@type": "Person",
+      "@id": "{{ config.site.url }}/#person",
+      "name": {{ config.identity.name | dump | safe }},
+      "url": "{{ config.site.url }}/",
+      "jobTitle": "Architect & Computational Designer",
+      "sameAs": {{ sameAs | dump | safe }},
+      "address": { "@type": "PostalAddress", "addressLocality": {{ config.based.label | dump | safe }} }
+    }
+  ]
+}
+{% endif %}
+</script>

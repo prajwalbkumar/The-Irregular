@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="{{ config.site.lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+{% include "head-seo.njk" %}
+{% fieldTokens %}
+{% fieldCSS %}
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.34.5/dist/globe.gl.min.js"></script>
+</head>
+<body>
+<a href="#paper" id="skip-link">SKIP TO CONTENT</a>
+
+<!-- Cursor -->
+<div id="cur-ring"></div>
+<div id="cur-label"></div>
+<div id="cur-dot"></div>
+<div id="cur-coords">X 0000 Y 0000</div>
+<div class="ch" id="ch-l"></div>
+<div class="ch" id="ch-r"></div>
+<div class="ch" id="ch-t"></div>
+<div class="ch" id="ch-b"></div>
+<div id="pickbox"></div>
+<div id="osnap"></div>
+<div id="osnap-lbl">End</div>
+<div class="cline" id="cl-t"></div>
+<div class="cline" id="cl-b"></div>
+<div class="cline" id="cl-l"></div>
+<div class="cline" id="cl-r"></div>
+
+<div id="plot-titleblock">
+  <span>PROJECT: {{ config.site.title }} — {{ config.site.tagline }}</span>
+  <span>DRAWN BY: {{ config.identity.name }}</span>
+  <span>SCALE 1:1 · REV {{ config.site.rev }}</span>
+  <span id="pt-date"></span>
+</div>
+
+<!-- Command line -->
+<div id="cmdline">
+  <div class="cmd-hist" id="cmd-hist"></div>
+  <div class="cmd-row">
+    <span class="cmd-prompt">Command:</span>
+    <input id="cmd-input" autocomplete="off" spellcheck="false" placeholder="type 'help' — Tab to complete">
+    <span id="cmd-hint"></span>
+  </div>
+</div>
+
+<!-- Boot -->
+<div id="boot">
+  <div id="boot-lines">
+    <div class="bl">Command: <span class="ok">_Open</span> "theirregular.3dm"</div>
+    <div class="bl">File loaded: 32 objects, 5 layers, 1 viewport.</div>
+    <div class="bl">Command: <span class="ok">_Osnap</span>&nbsp;&nbsp;End=On&nbsp;&nbsp;Near=Off&nbsp;&nbsp;Cen=Off</div>
+    <div class="bl">Command: <span class="ok">_ZoomExtents</span>&nbsp;&nbsp;position {{ config.based.lat | abs }}{{ 'N' if config.based.lat >= 0 else 'S' }} {{ config.based.lon | abs }}{{ 'E' if config.based.lon >= 0 else 'W' }}</div>
+    <div class="bl">Command: <span class="ok">_Print</span>&nbsp;&nbsp;press online<span class="ok">_</span></div>
+    <div id="boot-gate">▸ PRESS ENTER TO ENTER THE FIELD_</div>
+  </div>
+</div>
+
+<!-- Topbar / masthead -->
+<header id="topbar" role="banner">
+  <div class="tb-inner">
+    <div class="tb-l">
+      VOL.{{ config.site.vol }} · REV.{{ config.site.rev }} · EST {{ config.site.est }}<br>
+      <span class="acc">FIELD EDITION</span> — TEXT ONLY
+    </div>
+    <h1 class="masthead-name" id="masthead-name" data-cursor="TOP">THE IRREGULAR<span class="acc">_</span></h1>
+    <div class="tb-r">
+      <span id="tb-date">—</span>
+      <span>{{ homeCode }} <span id="tb-time">—</span> · <span id="tb-temp">—°C</span></span>
+    </div>
+  </div>
+  <nav class="filters" aria-label="Section navigation">
+    <span class="fl-label">Index</span>
+    <button class="fb nv" data-goto="#sec-flow" data-cursor="GO">01 Dispatches</button>
+    <button class="fb nv" data-goto="#sec-travel" data-cursor="GO">02 Travel</button>
+    <button class="fb nv" data-goto="#sec-photo" data-cursor="GO">03 Photography</button>
+    <button class="fb nv" data-goto="#sec-exp" data-cursor="GO">04 Experiments</button>
+    <button class="fb nv" data-goto="#sec-cv" data-cursor="GO">05 Personnel</button>
+    <button class="fb nv" data-goto="#morgue" data-cursor="GO">Morgue</button>
+    <span class="fl-label" style="margin-left:auto">FILTER &amp; SEARCH VIA <span style="color:var(--acc)">/ COMMAND</span></span>
+  </nav>
+  <div id="ticker"><div class="ticker-track" id="ticker-track"></div></div>
+</header>
+
+<!-- Paper -->
+<main id="paper">
+  <div id="lead-slot"></div>
+  <div class="pinned-panels" id="pinned-panels"></div>
+
+  <h2 class="sec-head rv" id="sec-flow">
+    <span class="sec-num">01</span>
+    <span class="sec-title">Dispatches</span>
+    <span class="sec-meta">RANDOM THOUGHTS · LAID OUT</span>
+  </h2>
+  <div class="flow" id="flow"></div>
+
+  <!-- FIELD LOG — TRAVEL TERRITORY -->
+  <h2 class="sec-head rv" id="sec-travel">
+    <span class="sec-num">02</span>
+    <span class="sec-title">Field Log — Travel</span>
+    <span class="sec-meta" id="travel-meta">LOGBOOK LOADING…</span>
+  </h2>
+  <div class="travel-grid">
+    <div class="tg-left">
+      <div id="map-wrap" class="rv">
+        <div class="map-note">WEBGL GLOBE<br>DRAG TO ORBIT · AUTO-SPIN<br>LIVE ROUTES EX-{{ homeCode }}</div>
+        <div id="globeViz"></div>
+        <div id="globe-offline">GLOBE OFFLINE — WEBGL OR NETWORK UNAVAILABLE</div>
+        <div id="dossier"></div>
+        <div class="flight-stats" id="flight-stats"></div>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+    </div>
+    <div class="tg-right">
+      <div class="travel-feed-intro rv">ALL TRAVEL DISPATCHES · FILED FROM THE FIELD</div>
+      <div id="travel-feed"></div>
+    </div>
+  </div>
+
+  <!-- PHOTOGRAPHY -->
+  <h2 class="sec-head rv" id="sec-photo">
+    <span class="sec-num">03</span>
+    <span class="sec-title">Photography</span>
+    <span class="sec-meta" id="photo-meta">CONTACT STRIP · DRAG / SCROLL →</span>
+  </h2>
+  <div class="photo-grid rv" id="photo-grid"></div>
+
+  <!-- EXPERIMENTS -->
+  <h2 class="sec-head rv" id="sec-exp">
+    <span class="sec-num">04</span>
+    <span class="sec-title">Experiments</span>
+    <span class="sec-meta">Personal Tech · {{ collections.experiments.length }} Logged</span>
+  </h2>
+  <div id="exp-list" class="rv"></div>
+
+  <!-- PERSONNEL FILE -->
+  <h2 class="sec-head rv" id="sec-cv">
+    <span class="sec-num">05</span>
+    <span class="sec-title">Personnel File</span>
+    <span class="sec-meta">{{ config.identity.stats.years }} YRS AEC+TECH · {{ config.identity.stats.projects }} PROJECTS · {{ config.identity.stats.countries }} COUNTRIES</span>
+  </h2>
+  <div class="cv-grid" id="cv-root"></div>
+
+  <div id="morgue">
+    <div class="mg-head"><span class="warn">⚠</span> THE MORGUE — DEPRECATED ENTRIES · PRESERVED · UNSTABLE</div>
+    <div id="mg-list"></div>
+  </div>
+</main>
+
+<!-- Status bar -->
+<footer id="statusbar" role="contentinfo">
+  <div class="sb-group">
+    <span class="sb-live">LIVE</span>
+    <span id="sb-time">00:00:00</span>
+    <span class="sb-hm" id="sb-tz"></span>
+    <span class="sb-hm" id="sb-upd"></span>
+    <button id="cmd-open-btn" data-cursor="TYPE">/ Command</button>
+    <span class="sb-hm" id="sb-osnap" style="color:var(--faint)">OSNAP: END</span>
+  </div>
+  <div class="sb-group">
+    <span class="sb-hm" id="sb-cursor">X 0000 Y 0000</span>
+    <span class="sb-hm" id="sb-count">32 OBJECTS</span>
+    <div id="sb-track"><div id="sb-fill"></div></div>
+    <span id="sb-pct">0%</span>
+  </div>
+</footer>
+
+<!-- Photo lightbox -->
+<div id="plight">
+  <img id="plight-img" src="" alt="">
+  <div id="plight-cap"></div>
+</div>
+
+<!-- Reader -->
+<div id="reader-back">
+  <div id="reader">
+    <div class="rd-top">
+      <span>{{ config.site.title }} / READER</span>
+      <button class="rd-x" data-cursor="CLOSE">ESC / Close</button>
+    </div>
+    <div class="rd-bd">
+      <div class="rd-meta" id="rd-meta"></div>
+      <div class="rd-title" id="rd-title"></div>
+      <div class="rd-body" id="rd-body"></div>
+    </div>
+    <div class="rd-nav">
+      <button id="rd-prev" data-cursor="PREV">←</button>
+      <button id="rd-next" data-cursor="NEXT">→</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.__FIELD = {
+  github: { username: "{{ config.identity.github }}" },
+  weather: { lat: {{ config.based.lat }}, lon: {{ config.based.lon }}, tz: "Asia/Dubai", cacheTTL: 3600000 },
+  based: { label: "{{ config.based.label }}", lat: {{ config.based.lat }}, lon: {{ config.based.lon }} }
+};
+
+/* ═══ 00-data.js — GENERATED by Eleventy from field.config.js + content/ ═══ */
+window.DATA = {{ {
+  identity: config.identity,
+  birthday: config.birthday,
+  lastUpdated: config.lastUpdated,
+  based: config.based,
+  cv: config.cv,
+  airports: config.airports,
+  flights: config.flights,
+  projects: config.projects,
+  hobbies: config.hobbies,
+  about: config.about,
+  now: config.now,
+  nowPlaying: config.nowPlaying,
+  lastfmUser: config.lastfmUser,
+  reading: config.reading,
+  challenge: config.challenge,
+  bucket: config.bucket,
+  toys: config.toys
+} | dump | safe }};
+const POSTS = {{ collections.posts | dump | safe }};
+const BRIEFS = {{ collections.briefs | dump | safe }};
+const QUOTES = {{ collections.quotes | dump | safe }};
+const MORGUE = {{ collections.morgue | dump | safe }};
+const EXPS = {{ collections.experiments | dump | safe }};
+const PHOTOS = {{ photos | dump | safe }};
+const FLOW = {{ flow | dump | safe }};
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FINE_PTR = matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+/* Selection state — global so cmdline/Esc are always safe even without marquee (touch) */
+let SELECTED = [];
+function clearSelection(){
+  SELECTED.forEach(el=>el.classList && el.classList.remove('sel'));
+  SELECTED = [];
+  const sc=document.getElementById('sb-count');
+  if(sc)sc.textContent='32 OBJECTS';
+}
+</script>
+{% fieldJS %}
+</body>
+</html>

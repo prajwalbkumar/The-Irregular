@@ -1,0 +1,33 @@
+# Contact-strip manifest. `src` is optional — omit it to fall back to a
+# picsum.photos placeholder seeded by `s`. `city` (optional) links the photo
+# into that city's dossier on the globe.
+- s: hiriketiya-surf
+  city: CMB
+  cap: F-001 · HIRIKETIYA · 5.96N 80.70E
+- s: galle-fort-wall
+  city: CMB
+  cap: F-002 · GALLE FORT · 6.02N 80.21E
+- s: dxb-5am-street
+  city: DXB
+  cap: F-003 · DUBAI 05:00 · 25.20N 55.27E
+- s: alquoz-industrial
+  city: DXB
+  cap: F-004 · AL QUOZ · 25.13N 55.23E
+- s: tbilisi-old-town
+  city: TBS
+  cap: F-005 · TBILISI · 41.69N 44.80E
+- s: lisbon-tram-28
+  city: LIS
+  cap: F-006 · LISBON · 38.71N 9.14W
+- s: istanbul-karakoy
+  city: IST
+  cap: F-007 · KARAKÖY · 41.02N 28.97E
+- s: sur-dhow-yard
+  city: MCT
+  cap: F-008 · SUR, OMAN · 22.57N 59.53E
+- s: muttrah-corniche
+  city: MCT
+  cap: F-009 · MUTTRAH · 23.62N 58.56E
+- s: singapore-rain
+  city: SIN
+  cap: F-010 · SINGAPORE · 1.28N 103.85E

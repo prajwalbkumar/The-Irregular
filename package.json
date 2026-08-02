@@ -1,0 +1,34 @@
+{
+  "name": "create-field-broadsheet",
+  "version": "0.1.0",
+  "description": "THE IRREGULAR — Field Edition. A dark computational-field personal site, authored in Markdown, compiled by Eleventy into one page.",
+  "bin": {
+    "create-field-broadsheet": "./cli.js"
+  },
+  "files": [
+    "cli.js",
+    "eleventy.config.js",
+    "field.config.js",
+    "src",
+    "reference",
+    "test",
+    "README.md",
+    "LICENSE",
+    ".gitignore"
+  ],
+  "scripts": {
+    "dev": "eleventy --serve",
+    "build": "eleventy",
+    "clean": "rm -rf dist",
+    "test": "node test/suite.js"
+  },
+  "dependencies": {
+    "@11ty/eleventy": "^3.0.0",
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.1.0",
+    "markdown-it": "^14.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}
