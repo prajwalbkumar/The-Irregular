@@ -8,10 +8,22 @@
 {% fieldTokens %}
 {% fieldCSS %}
 <style>
-  #post-standalone{max-width:720px;margin:0 auto;padding:3rem 2rem 6rem}
+  #post-wrap{display:flex;justify-content:center;gap:2.5rem;padding:0 2rem;align-items:flex-start}
+  #post-standalone{max-width:720px;width:100%;padding:3rem 0 6rem}
   #post-standalone .rd-meta{margin-top:2rem}
   #post-standalone .back-link{display:inline-block;margin-top:2.5rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.15em;text-transform:uppercase;color:var(--dim)}
   #post-standalone .back-link:hover{color:var(--acc)}
+  /* Table of contents rail — only present at all when the post has enough
+     headings to warrant one (see `hasToc` below); hidden below 1100px since
+     there's no room for a third column once the viewport narrows. */
+  #post-toc{position:sticky;top:120px;width:200px;flex-shrink:0;padding:3rem 0 0}
+  .post-toc-label{font-family:var(--mono);font-size:.5rem;letter-spacing:.2em;color:var(--faint);text-transform:uppercase;margin-bottom:.9rem}
+  #post-toc nav{display:flex;flex-direction:column;gap:.55rem;border-left:1px solid var(--line);padding-left:1rem}
+  #post-toc a{font-size:.78rem;line-height:1.4;color:var(--dim);transition:color .15s}
+  #post-toc a.toc-lvl3{padding-left:.8rem;font-size:.72rem}
+  #post-toc a:hover{color:var(--fg)}
+  #post-toc a.here{color:var(--acc)}
+  @media (max-width:1100px){ #post-toc{display:none} }
 </style>
 </head>
 <body>
@@ -23,16 +35,110 @@
       <span class="acc">FIELD EDITION</span> — TEXT ONLY
     </div>
     <a href="/" class="masthead-name" style="text-decoration:none">THE IRREGULAR<span class="acc">_</span></a>
-    <div class="tb-r"><span>{{ homeCode }}</span></div>
+    <div class="tb-r">
+      <span id="tb-date">—</span>
+      <span>{{ homeCode }} <span id="tb-time">—</span> · <span id="tb-temp">—°C</span></span>
+    </div>
   </div>
 </header>
-<main id="post-standalone">
-  <article>
-    <div class="rd-meta">{{ num }} · {{ tag | upper }} · {{ date | dotDate }}</div>
-    <h1 class="rd-title">{{ title }}</h1>
-    <div class="rd-body">{{ content | safe }}</div>
-  </article>
-  <a class="back-link" href="/#open={{ num }}">← BACK TO THE FIELD</a>
-</main>
+<script>
+(function(){
+  function tick(){
+    var t = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Dubai', hour12: false });
+    var te = document.getElementById('tb-time'); if (te) te.textContent = t.slice(0, 5);
+  }
+  tick(); setInterval(tick, 1000);
+  var de = document.getElementById('tb-date');
+  if (de) de.textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+
+  /* Same cache key as the field's own weather fetch (10-render.js) — shared
+     across both, so visiting one warms the other. */
+  var CACHE_KEY = 'field_wx', TTL = 3600000;
+  function cached(fetcher){
+    try {
+      var hit = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (hit && Date.now() - hit.ts < TTL) return Promise.resolve(hit.data);
+    } catch (e) {}
+    return fetcher().then(function(data){
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data })); } catch (e) {}
+      return data;
+    });
+  }
+  cached(function(){
+    return fetch('https://api.open-meteo.com/v1/forecast?latitude={{ config.based.lat }}&longitude={{ config.based.lon }}&current=temperature_2m&timezone=Asia%2FDubai')
+      .then(function(r){ return r.json(); })
+      .then(function(d){ return Math.round(d.current.temperature_2m); });
+  }).then(function(temp){
+    var el = document.getElementById('tb-temp'); if (el) el.textContent = temp + '°C';
+  }).catch(function(){});
+})();
+</script>
+{% set thisPost = collections.posts | findBy("id", id) %}
+{% set hasToc = thisPost and thisPost.toc.length >= 3 %}
+<div id="post-wrap">
+  <main id="post-standalone">
+    <article>
+      <div class="rd-meta">{{ num }} · {{ tag | upper }} · {{ date | dotDate }}</div>
+      <h1 class="rd-title">{{ title }}</h1>
+      <div class="rd-body">{{ content | safe }}</div>
+    </article>
+    <a class="back-link" href="/#open={{ num }}">← BACK TO THE FIELD</a>
+  </main>
+  {% if hasToc %}
+  <aside id="post-toc" aria-label="Table of contents">
+    <div class="post-toc-label">On This Page</div>
+    <nav>
+      {% for h in thisPost.toc %}
+      <a href="#{{ h.id }}" class="toc-lvl{{ h.level }}">{{ h.text }}</a>
+      {% endfor %}
+    </nav>
+  </aside>
+  {% endif %}
+</div>
+<footer id="statusbar" role="contentinfo">
+  <div class="sb-group">
+    <span class="sb-live">LIVE</span>
+    <span id="sb-time">00:00:00</span>
+  </div>
+  <div class="sb-group">
+    <span>READING PROGRESS</span>
+    <div id="sb-track"><div id="sb-fill"></div></div>
+    <span id="sb-pct">0%</span>
+  </div>
+</footer>
+<script>
+(function(){
+  function tick(){
+    var t = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Dubai', hour12: false });
+    var se = document.getElementById('sb-time'); if (se) se.textContent = t;
+  }
+  tick(); setInterval(tick, 1000);
+  addEventListener('scroll', function(){
+    var pct = Math.round(scrollY / (document.body.scrollHeight - innerHeight) * 100) || 0;
+    var fill = document.getElementById('sb-fill'), pctEl = document.getElementById('sb-pct');
+    if (fill) fill.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+  }, { passive: true });
+})();
+</script>
+{% if hasToc %}
+<script>
+(function(){
+  var links = document.querySelectorAll('#post-toc a');
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (!e.isIntersecting) return;
+      links.forEach(function(a){ a.classList.remove('here'); });
+      var a = map[e.target.id];
+      if (a) a.classList.add('here');
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('.rd-body h2[id], .rd-body h3[id]').forEach(function(h){ io.observe(h); });
+})();
+</script>
+{% endif %}
 </body>
 </html>

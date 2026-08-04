@@ -64,6 +64,7 @@ and just run `npm install` once, then the same `npm run dev`/`build`/`test`.
 | `markdown-it-mark` (^4.0.0) | `==highlight==` → `<mark>` |
 | `markdown-it-footnote` (^4.0.0) | `[^1]` reference footnotes |
 | `markdown-it-task-lists` (^2.1.1) | `- [ ]` / `- [x]` checkboxes |
+| `markdown-it-anchor` (^9.2.1) | Stamps an `id` on every h2/h3, which the table-of-contents feature reads |
 
 ### Dev-only (`devDependencies`)
 
@@ -108,6 +109,8 @@ vercel.json                  tells Vercel to build with `npm run build`, serve `
 api/
   nowplaying.js               Spotify proxy — see Spotify Now Playing
 .env.example                 the three SPOTIFY_* env vars the proxy needs (copy to .env.local)
+.cache/
+  bookmarks.json              fetched Open Graph data for bookmark-card URLs — committed, not gitignored
 
 src/
   index.njk                  the field — assembles collections into DOM + client-side data
@@ -256,12 +259,15 @@ identical in both places.
 | Blockquote | `> text` | Plain quote styling — see Callouts for the `[!type]` variant |
 | Inline code / fenced code | `` `code` ``, ` ```lang ` | Fenced blocks get a `language-xxx` class on the `<code>` for optional syntax-highlighting hookup |
 | Tables | GFM pipe tables | Standard (markdown-it core) |
-| Links / images | `[text](url)`, `![alt](url)` | Standard |
+| Links | `[text](url)` | Standard |
+| Images | `![alt](url)`, `![alt](url "caption")` | Responsive by default. The optional third argument renders as a `<figcaption>` under the image |
 | Horizontal rule | `---` | Standard |
 | Footnotes | `text[^1]` … `[^1]: definition` | `markdown-it-footnote`. **Don't** put a footnote reference inside a callout's title line — see below |
 | Wikilinks | `[[Post Title]]`, `[[Post Title\|Display Text]]` | Custom inline rule (`markdown.config.js`), matched against every post's `title`/`id`/`slug`. Resolves to `/posts/<slug>/`; no match renders as plain dashed-underline text, mirroring Obsidian's own "unresolved link" look |
 | Callouts | `> [!note]`, `> [!tip]`, `> [!warning]`, `> [!danger]`, `> [!note]-` (collapsed), `> [!note]+` (foldable, open) | Custom source-level extraction (`markdown.config.js`), not a token-level plugin. Type maps to one of four tones reusing the site's existing status colors — see table below. Titles support inline formatting (bold/italic/wikilinks) but not footnotes (see above) |
 | Comments | `%% text %%` | Stripped entirely before rendering — never appears in either the reader or the standalone page |
+| Table of contents | *(automatic)* | Any post with 3+ h2/h3 headings gets one automatically — a sticky right rail on the standalone page, a "Contents" toggle drawer in the in-page reader. See below |
+| Bookmark cards | A bare URL alone on its own line | A rich preview card (title/description/image), Ghost-editor style. See below |
 
 **Callout tone mapping** (`CALLOUT_TYPES` in `markdown.config.js` — add more
 aliases there if you want them):
@@ -273,6 +279,53 @@ aliases there if you want them):
 | `danger` | red `#ff5c57` | `danger`, `error`, `failure`, `fail`, `missing`, `bug` |
 | `acc` (default) | acid green | `tip`, `hint`, `important`, `success`, `check`, `done`, `question`, `help`, `faq`, `example`, and anything unrecognized |
 | `dim` | neutral/italic | `abstract`, `summary`, `tldr`, `quote`, `cite` |
+
+### Table of contents
+
+Long-form posts (3+ h2/h3 headings — `markdown-it-anchor` stamps an `id` on
+every one) get a table of contents automatically, no frontmatter flag needed:
+
+- **Standalone page** (`layouts/post.njk`) — a sticky rail to the right of the
+  article, scrollspy-highlighted as you scroll (`rootMargin:'-20% 0px -70% 0px'`).
+  Hidden below 1100px — there's no room for a third column once the viewport narrows.
+- **In-page reader** (`70-reader.js`) — a "Contents" button appears in the
+  reader's top bar; clicking it slides in a drawer fixed to the right edge of
+  the *viewport* (independent of the reader panel's own centered width),
+  listing the same headings. Clicking one scrolls the reader to that section
+  and closes the drawer.
+
+Both read from the same `toc: [{level, id, text}]` array, computed once per
+post in `eleventy.config.js` alongside its `body`.
+
+### Bookmark cards
+
+Paste a URL alone on its own line (blank line before and after — the same
+gesture that turns a link into a bookmark card in Ghost's editor) and it
+becomes a card with the target page's title, description, and image:
+
+```
+Some paragraph of text.
+
+https://ghost.org/
+
+Another paragraph.
+```
+
+A URL inside a sentence, or written as `[text](url)`, is never touched — only
+a lone URL on its own line qualifies.
+
+**How it's fetched**: `eleventy.config.js` runs an async prefetch pass before
+any rendering starts — it scans every post and morgue file for bookmark-style
+URLs, fetches each new one's Open Graph tags (`og:title`/`og:description`/
+`og:image`, falling back to `<title>`/meta description), and caches the
+result in `.cache/bookmarks.json`. That file is **committed to the repo**
+(not gitignored) — once a URL has been fetched once, the build never needs
+the network for it again, and a fresh clone builds identically offline. A
+failed fetch (offline, 404, timeout) just leaves the line as a plain
+auto-linked URL — nothing breaks the build.
+
+To force a re-fetch (the target page changed), delete its entry from
+`.cache/bookmarks.json` — or the whole file — and rebuild.
 
 **Deliberately not implemented** — both are genuine Obsidian features, left out
 for reasons specific to a public website rather than oversight:
@@ -322,10 +375,18 @@ The site ships two kinds of pages from one `npm run build`:
 2. **Standalone post pages** (`/posts/<slug>/`) — one real, crawlable, fully
    SEO'd page per dispatch, built via `src/_includes/layouts/post.njk`. The
    slug is the filename with any leading `YYYY-MM-DD-` date stripped
-   (Eleventy's default `fileSlug` behavior).
+   (Eleventy's default `fileSlug` behavior). Its topbar matches the field's
+   masthead exactly (same typography, same live clock/date/temperature —
+   sharing the same `localStorage` weather cache), and its footer mirrors the
+   field's status bar with a live clock and a reading-progress bar — but it
+   intentionally skips the nav filters, ticker, and the cursor/command-line/
+   globe JS bundle. It's a reading page, not a second field.
 
 They're linked together:
 
+- Every post opened in the reader shows a **"Full Page ↗"** link next to
+  Contents/Close, for anyone who'd rather read it as its own page (or share
+  that exact link) instead of the overlay.
 - Opening a post from the field (click, ticker, search, deep link) calls
   `history.pushState` to the canonical `/posts/<slug>/` URL, so the address bar
   is always shareable. Closing the reader restores `/`. Back/forward

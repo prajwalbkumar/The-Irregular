@@ -55,6 +55,38 @@ let cur = null, curType = 'post';
 function wordCount(blocks) {
   return blocks.join(' ').replace(/<[^>]+>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
 }
+// Reader TOC drawer — only for posts with 3+ headings (short posts don't
+// need one). A fixed right-edge panel, independent of the reader's own
+// centered width, toggled by the "Contents" button in .rd-top.
+function renderTocFor(toc) {
+  const toggle = document.getElementById('rd-toc-toggle');
+  const nav = document.getElementById('rd-toc-nav');
+  document.getElementById('rd-toc').classList.remove('open');
+  if (!toc || toc.length < 3) {
+    toggle.hidden = true;
+    nav.innerHTML = '';
+    return;
+  }
+  toggle.hidden = false;
+  nav.innerHTML = toc.map(h =>
+    `<a href="#${h.id}" class="toc-lvl${h.level}" data-target="${h.id}">${h.text}</a>`).join('');
+}
+document.getElementById('rd-toc-toggle')?.addEventListener('click', () => {
+  document.getElementById('rd-toc').classList.toggle('open');
+});
+document.getElementById('rd-toc-nav')?.addEventListener('click', e => {
+  const a = e.target.closest('a[data-target]');
+  if (!a) return;
+  e.preventDefault();
+  const target = document.getElementById(a.dataset.target);
+  const back = document.getElementById('reader-back');
+  if (target && back) {
+    const y = target.getBoundingClientRect().top - back.getBoundingClientRect().top + back.scrollTop - 20;
+    back.scrollTo({ top: y, behavior: 'smooth' });
+  }
+  document.getElementById('rd-toc').classList.remove('open');
+});
+
 function renderPost(p) {
   cur = p.id; curType = 'post';
   const readMin = Math.max(1, Math.round(wordCount(p.body) / 220));
@@ -63,6 +95,10 @@ function renderPost(p) {
   document.getElementById('rd-meta').textContent = `${p.num} · ${p.tag.toUpperCase()} · ${p.date} · ${readMin} MIN READ${depthTxt}`;
   document.getElementById('rd-title').textContent = p.title;
   document.getElementById('rd-body').innerHTML = p.body.join('');
+  renderTocFor(p.toc);
+  const fullPage = document.getElementById('rd-fullpage');
+  if (p.slug) { fullPage.href = '/posts/' + p.slug + '/'; fullPage.hidden = false; }
+  else { fullPage.hidden = true; }
   const i = POSTS.findIndex(x => x.id === p.id), prev = POSTS[i - 1], next = POSTS[i + 1];
   const pb = document.getElementById('rd-prev'), nb = document.getElementById('rd-next');
   pb.disabled = !prev; nb.disabled = !next;
@@ -84,6 +120,8 @@ function openMorgue(i) {
   document.getElementById('rd-meta').textContent = `${m.num} · ${m.stamp} · MORGUE`;
   document.getElementById('rd-title').textContent = m.title;
   document.getElementById('rd-body').innerHTML = m.body.join('');
+  renderTocFor(null);
+  document.getElementById('rd-fullpage').hidden = true;
   const pb = document.getElementById('rd-prev'), nb = document.getElementById('rd-next');
   pb.disabled = i <= 0; nb.disabled = i >= MORGUE.length - 1;
   pb.textContent = '←'; nb.textContent = '→';

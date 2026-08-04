@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const matter = require('gray-matter');
 const cfg = require('./field.config.js');
-const { createMarkdownIt, renderBodyBlocks, renderInlineText } = require('./markdown.config.js');
+const {
+  createMarkdownIt, renderBody, renderInlineText,
+  loadBookmarkCache, saveBookmarkCache, prefetchBookmarks
+} = require('./markdown.config.js');
 
 // Eleventy's reserved `date` frontmatter key must be a real Date (or one of
 // its special keywords) — content authors write plain ISO, we reformat to
@@ -23,58 +26,84 @@ function computeFileSlug(filePath) {
   return path.basename(filePath, '.md').replace(/^\d{4}-\d{2}-\d{2}[-_]/, '');
 }
 
-function buildPostIndex() {
-  const dir = 'src/content/posts';
+function readMarkdownDir(dir) {
   return fs.readdirSync(dir)
     .filter(f => f.endsWith('.md') && !f.startsWith('_'))
-    .map(f => {
-      const full = path.join(dir, f);
-      const { data } = matter(fs.readFileSync(full, 'utf8'));
-      return { id: data.id, title: data.title, slug: computeFileSlug(full) };
-    });
+    .map(f => path.join(dir, f));
 }
 
-module.exports = function (ec) {
+function buildPostIndex(postFiles) {
+  return postFiles.map(full => {
+    const { data } = matter(fs.readFileSync(full, 'utf8'));
+    return { id: data.id, title: data.title, slug: computeFileSlug(full) };
+  });
+}
+
+// Eleventy awaits an async config export — used here for exactly one thing:
+// prefetching bookmark-card metadata (network) before any markdown gets
+// rendered, so the rest of the build (both the standalone pages' own
+// md.render() and this file's synchronous collection-mapping below) can stay
+// fully synchronous and still have bookmark cards resolve correctly.
+module.exports = async function (ec) {
   ec.addPassthroughCopy('src/assets');
+
+  const postFiles = readMarkdownDir('src/content/posts');
+  const morgueFiles = readMarkdownDir('src/content/morgue');
+  const postIndex = buildPostIndex(postFiles);
+
+  const bookmarkCache = loadBookmarkCache();
+  await prefetchBookmarks(
+    [...postFiles, ...morgueFiles].map(f => matter(fs.readFileSync(f, 'utf8')).content),
+    bookmarkCache
+  );
+  if (bookmarkCache.__dirty) saveBookmarkCache(bookmarkCache);
 
   // Shared markdown-it — used for every content body below AND (via
   // setLibrary) for the standalone /posts/<slug>/ pages, so a post renders
   // identically in the in-page reader and its own real page.
-  const md = createMarkdownIt(buildPostIndex());
+  const md = createMarkdownIt(postIndex, bookmarkCache);
   ec.setLibrary('md', md);
 
   // ── Collections from content/ — plain objects, shapes match the prototype ──
   ec.addCollection('posts', c => c
     .getFilteredByGlob('src/content/posts/*.md')
-    .map(item => ({
-      id: item.data.id,
-      num: item.data.num,
-      tag: item.data.tag,
-      city: item.data.city || null,
-      date: dotDate(item.data.date),
-      size: item.data.size,
-      title: item.data.title,
-      excerpt: item.data.excerpt,
-      slug: item.fileSlug,
-      body: renderBodyBlocks(md, rawContent(item))
-    }))
+    .map(item => {
+      const { blocks, toc } = renderBody(md, rawContent(item));
+      return {
+        id: item.data.id,
+        num: item.data.num,
+        tag: item.data.tag,
+        city: item.data.city || null,
+        date: dotDate(item.data.date),
+        size: item.data.size,
+        title: item.data.title,
+        excerpt: item.data.excerpt,
+        slug: item.fileSlug,
+        body: blocks,
+        toc
+      };
+    })
     .sort((a, b) => a.num.localeCompare(b.num)));
 
   ec.addCollection('travel', c => c
     .getFilteredByGlob('src/content/posts/*.md')
     .filter(item => item.data.tag === 'travel')
-    .map(item => ({
-      id: item.data.id,
-      num: item.data.num,
-      tag: item.data.tag,
-      city: item.data.city || null,
-      date: dotDate(item.data.date),
-      size: item.data.size,
-      title: item.data.title,
-      excerpt: item.data.excerpt,
-      slug: item.fileSlug,
-      body: renderBodyBlocks(md, rawContent(item))
-    }))
+    .map(item => {
+      const { blocks, toc } = renderBody(md, rawContent(item));
+      return {
+        id: item.data.id,
+        num: item.data.num,
+        tag: item.data.tag,
+        city: item.data.city || null,
+        date: dotDate(item.data.date),
+        size: item.data.size,
+        title: item.data.title,
+        excerpt: item.data.excerpt,
+        slug: item.fileSlug,
+        body: blocks,
+        toc
+      };
+    })
     .sort((a, b) => (a.date < b.date ? 1 : -1)));
 
   ec.addCollection('briefs', c => c
@@ -103,7 +132,7 @@ module.exports = function (ec) {
       num: item.data.num,
       stamp: item.data.stamp,
       title: item.data.title,
-      body: renderBodyBlocks(md, rawContent(item))
+      body: renderBody(md, rawContent(item)).blocks
     }))
     .sort((a, b) => a.num.localeCompare(b.num)));
 

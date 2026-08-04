@@ -180,6 +180,8 @@
   <div id="reader">
     <div class="rd-top">
       <span>{{ config.site.title }} / READER</span>
+      <a class="rd-toc-toggle" id="rd-fullpage" data-cursor="GO" hidden>Full Page ↗</a>
+      <button class="rd-toc-toggle" id="rd-toc-toggle" data-cursor="TYPE" hidden>Contents</button>
       <button class="rd-x" data-cursor="CLOSE">ESC / Close</button>
     </div>
     <div class="rd-bd">
@@ -192,6 +194,10 @@
       <button id="rd-next" data-cursor="NEXT">→</button>
     </div>
   </div>
+  <aside id="rd-toc" aria-label="Table of contents">
+    <div class="rd-toc-label">On This Page</div>
+    <nav id="rd-toc-nav"></nav>
+  </aside>
 </div>
 
 <script>
