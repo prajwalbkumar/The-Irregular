@@ -50,15 +50,19 @@ document.getElementById('plight').addEventListener('click', () => closePlight())
 
 /* ═══ READER ═══════════════════════════════════════════ */
 let cur = null, curType = 'post';
+// body arrays are pre-rendered HTML blocks (markdown.config.js) — strip tags
+// to get a plain word count for the reading-time estimate.
+function wordCount(blocks) {
+  return blocks.join(' ').replace(/<[^>]+>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
+}
 function renderPost(p) {
   cur = p.id; curType = 'post';
-  const words = p.body.join(' ').split(/\s+/).length;
-  const readMin = Math.max(1, Math.round(words / 220));
+  const readMin = Math.max(1, Math.round(wordCount(p.body) / 220));
   const depth = _readDepth[p.id] || 0;
   const depthTxt = depth > 0 ? ` · READ ${depth}% · ${Math.max(1, Math.round(readMin * (1 - depth / 100)))} MIN LEFT` : '';
   document.getElementById('rd-meta').textContent = `${p.num} · ${p.tag.toUpperCase()} · ${p.date} · ${readMin} MIN READ${depthTxt}`;
   document.getElementById('rd-title').textContent = p.title;
-  document.getElementById('rd-body').innerHTML = p.body.map(t => `<p>${t}</p>`).join('');
+  document.getElementById('rd-body').innerHTML = p.body.join('');
   const i = POSTS.findIndex(x => x.id === p.id), prev = POSTS[i - 1], next = POSTS[i + 1];
   const pb = document.getElementById('rd-prev'), nb = document.getElementById('rd-next');
   pb.disabled = !prev; nb.disabled = !next;
@@ -79,7 +83,7 @@ function openMorgue(i) {
   const m = MORGUE[i]; cur = i; curType = 'morgue';
   document.getElementById('rd-meta').textContent = `${m.num} · ${m.stamp} · MORGUE`;
   document.getElementById('rd-title').textContent = m.title;
-  document.getElementById('rd-body').innerHTML = m.body.map(t => `<p>${t}</p>`).join('');
+  document.getElementById('rd-body').innerHTML = m.body.join('');
   const pb = document.getElementById('rd-prev'), nb = document.getElementById('rd-next');
   pb.disabled = i <= 0; nb.disabled = i >= MORGUE.length - 1;
   pb.textContent = '←'; nb.textContent = '→';

@@ -379,6 +379,95 @@ body.cursor-on #cur-dot,body.cursor-on #cur-ring,body.cursor-on #cur-coords{disp
   line-height:1.05;letter-spacing:-.02em;margin-bottom:1.4rem;
 }
 .rd-body p{font-size:.92rem;line-height:1.78;color:rgba(var(--ink),.82);font-weight:300;margin-bottom:1rem}
+
+/* ═══ RICH MARKDOWN CONTENT — headings, lists, blockquote, code, tables,
+   callouts, wikilinks, task lists, footnotes. Shared by the reader overlay
+   (.rd-body), the standalone post pages (also .rd-body, via layouts/post.njk),
+   and the lead post's two-column body (.lead-cols). Content bucket — never
+   drop below the two-bucket type floor (§2) to fit more on screen. ═══ */
+.rd-body h2,.lead-cols h2{font-family:var(--disp);font-weight:700;font-size:1.3rem;letter-spacing:-.015em;margin:1.6rem 0 .8rem;color:var(--fg)}
+.rd-body h3,.lead-cols h3{font-family:var(--disp);font-weight:500;font-size:1.05rem;margin:1.4rem 0 .7rem;color:var(--fg)}
+.rd-body h2:first-child,.lead-cols h2:first-child,
+.rd-body h3:first-child,.lead-cols h3:first-child{margin-top:0}
+.rd-body ul,.rd-body ol,.lead-cols ul,.lead-cols ol{
+  font-size:.92rem;line-height:1.78;color:rgba(var(--ink),.82);font-weight:300;
+  margin:0 0 1rem;padding-left:1.4rem;
+}
+.rd-body li,.lead-cols li{margin-bottom:.35rem}
+.rd-body ul ul,.rd-body ol ol,.rd-body ul ol,.rd-body ol ul,
+.lead-cols ul ul,.lead-cols ol ol{margin:.35rem 0 0;padding-left:1.3rem}
+.rd-body blockquote,.lead-cols blockquote{
+  border-left:2px solid var(--line);margin:0 0 1rem;padding:.1rem 0 .1rem 1.1rem;
+  font-size:.92rem;line-height:1.7;color:var(--dim);font-style:italic;
+}
+.rd-body blockquote p:last-child,.lead-cols blockquote p:last-child{margin-bottom:0}
+.rd-body hr,.lead-cols hr{border:none;border-top:1px solid var(--line);margin:1.6rem 0}
+.rd-body code,.lead-cols code{
+  font-family:var(--mono);font-size:.82em;color:var(--acc);
+  background:rgba(var(--acc-rgb),.08);padding:.1em .35em;
+}
+.rd-body pre,.lead-cols pre{
+  background:var(--card);border:1px solid var(--line);padding:1rem 1.2rem;
+  overflow-x:auto;margin:0 0 1rem;
+}
+.rd-body pre code,.lead-cols pre code{
+  background:none;padding:0;color:rgba(var(--ink),.9);font-size:.78rem;line-height:1.6;
+}
+.rd-body mark,.lead-cols mark{background:rgba(var(--acc-rgb),.3);color:var(--fg);padding:0 .1em}
+.rd-body table,.lead-cols table{
+  width:100%;border-collapse:collapse;margin:0 0 1.2rem;font-size:.82rem;
+}
+.rd-body th,.rd-body td,.lead-cols th,.lead-cols td{
+  border:1px solid var(--line);padding:.5rem .7rem;text-align:left;color:rgba(var(--ink),.82);
+}
+.rd-body th,.lead-cols th{
+  font-family:var(--mono);font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);font-weight:400;background:var(--card);
+}
+/* Task lists — display only, checked/unchecked; not interactive */
+.rd-body .contains-task-list,.lead-cols .contains-task-list{list-style:none;padding-left:.2rem}
+.rd-body .task-list-item,.lead-cols .task-list-item{margin-bottom:.35rem}
+.rd-body .task-list-item-checkbox,.lead-cols .task-list-item-checkbox{
+  margin-right:.6rem;accent-color:var(--acc);pointer-events:none;
+}
+/* Wikilinks — resolved vs. unresolved mirrors Obsidian's own visual cue */
+.rd-body .wikilink,.lead-cols .wikilink{color:var(--acc);border-bottom:1px solid rgba(var(--acc-rgb),.3)}
+.rd-body .wikilink:hover,.lead-cols .wikilink:hover{border-color:var(--acc)}
+.rd-body .wikilink-unresolved,.lead-cols .wikilink-unresolved{
+  color:var(--faint);border-bottom:1px dashed var(--faint);cursor:help;
+}
+/* Footnotes */
+.rd-body .footnotes-sep,.lead-cols .footnotes-sep{margin:1.8rem 0 1rem}
+.rd-body .footnotes,.lead-cols .footnotes{
+  font-family:var(--mono);font-size:.72rem;line-height:1.7;color:var(--dim);
+}
+.rd-body .footnotes-list,.lead-cols .footnotes-list{padding-left:1.2rem}
+.rd-body .footnote-ref a,.rd-body .footnote-backref,
+.lead-cols .footnote-ref a,.lead-cols .footnote-backref{color:var(--acc)}
+/* Callouts — Obsidian's `> [!type]`; tone maps to the site's existing status
+   colors (amber/blue/red/acid) rather than inventing a new palette */
+.rd-body .callout,.lead-cols .callout{
+  border-left:3px solid var(--acc);background:var(--card);
+  padding:.9rem 1.1rem;margin:0 0 1.2rem;
+}
+.rd-body .callout-title,.lead-cols .callout-title{
+  font-family:var(--disp);font-weight:600;font-size:.88rem;margin-bottom:.5rem;
+  display:flex;align-items:center;gap:.5rem;cursor:default;
+}
+.rd-body .callout-body>*:last-child,.lead-cols .callout-body>*:last-child{margin-bottom:0}
+.rd-body .callout-info,.lead-cols .callout-info{border-left-color:#57b0ff}
+.rd-body .callout-info .callout-title,.lead-cols .callout-info .callout-title{color:#57b0ff}
+.rd-body .callout-warn,.lead-cols .callout-warn{border-left-color:#e8a33d}
+.rd-body .callout-warn .callout-title,.lead-cols .callout-warn .callout-title{color:#e8a33d}
+.rd-body .callout-danger,.lead-cols .callout-danger{border-left-color:#ff5c57}
+.rd-body .callout-danger .callout-title,.lead-cols .callout-danger .callout-title{color:#ff5c57}
+.rd-body .callout-acc,.lead-cols .callout-acc{border-left-color:var(--acc)}
+.rd-body .callout-acc .callout-title,.lead-cols .callout-acc .callout-title{color:var(--acc)}
+.rd-body .callout-dim,.lead-cols .callout-dim{border-left-color:var(--faint)}
+.rd-body .callout-dim .callout-title,.lead-cols .callout-dim .callout-title{color:var(--dim);font-style:italic}
+/* summary markers get the native disclosure triangle; style it to match */
+.rd-body details.callout>summary,.lead-cols details.callout>summary{list-style:revert;cursor:pointer}
+
 .rd-nav{display:flex;border-top:1px solid var(--line)}
 .rd-nav button{
   flex:1;background:none;border:none;color:var(--dim);

@@ -1,9 +1,9 @@
 const fs = require('fs');
+const path = require('path');
 const matter = require('gray-matter');
 const cfg = require('./field.config.js');
+const { createMarkdownIt, renderBodyBlocks, renderInlineText } = require('./markdown.config.js');
 
-// Raw pre-render markdown body, split on blank lines — the shape the reader
-// (and every content array in the prototype) expects: body:[...paragraphs].
 // Eleventy's reserved `date` frontmatter key must be a real Date (or one of
 // its special keywords) — content authors write plain ISO, we reformat to
 // the dotted display string (2026.01.14) the prototype/spec both use.
@@ -11,18 +11,37 @@ function dotDate(d) {
   return d.toISOString().slice(0, 10).replace(/-/g, '.');
 }
 
-function paragraphsFor(item) {
+function rawContent(item) {
   const raw = fs.readFileSync(item.inputPath, 'utf8');
-  const { content } = matter(raw);
-  return content
-    .trim()
-    .split(/\r?\n\s*\r?\n/)
-    .map(s => s.trim())
-    .filter(Boolean);
+  return matter(raw).content.trim();
+}
+
+// Same rule Eleventy uses for `page.fileSlug`: strip a leading YYYY-MM-DD(-|_)
+// date prefix from the filename. Computed by hand here because this runs
+// *before* collections exist (it feeds the wikilink resolver's post index).
+function computeFileSlug(filePath) {
+  return path.basename(filePath, '.md').replace(/^\d{4}-\d{2}-\d{2}[-_]/, '');
+}
+
+function buildPostIndex() {
+  const dir = 'src/content/posts';
+  return fs.readdirSync(dir)
+    .filter(f => f.endsWith('.md') && !f.startsWith('_'))
+    .map(f => {
+      const full = path.join(dir, f);
+      const { data } = matter(fs.readFileSync(full, 'utf8'));
+      return { id: data.id, title: data.title, slug: computeFileSlug(full) };
+    });
 }
 
 module.exports = function (ec) {
   ec.addPassthroughCopy('src/assets');
+
+  // Shared markdown-it — used for every content body below AND (via
+  // setLibrary) for the standalone /posts/<slug>/ pages, so a post renders
+  // identically in the in-page reader and its own real page.
+  const md = createMarkdownIt(buildPostIndex());
+  ec.setLibrary('md', md);
 
   // ── Collections from content/ — plain objects, shapes match the prototype ──
   ec.addCollection('posts', c => c
@@ -37,7 +56,7 @@ module.exports = function (ec) {
       title: item.data.title,
       excerpt: item.data.excerpt,
       slug: item.fileSlug,
-      body: paragraphsFor(item)
+      body: renderBodyBlocks(md, rawContent(item))
     }))
     .sort((a, b) => a.num.localeCompare(b.num)));
 
@@ -54,7 +73,7 @@ module.exports = function (ec) {
       title: item.data.title,
       excerpt: item.data.excerpt,
       slug: item.fileSlug,
-      body: paragraphsFor(item)
+      body: renderBodyBlocks(md, rawContent(item))
     }))
     .sort((a, b) => (a.date < b.date ? 1 : -1)));
 
@@ -65,7 +84,7 @@ module.exports = function (ec) {
       label: `${String(item.data.tag).toUpperCase()} · BRIEF`,
       city: item.data.city || null,
       order: item.data.order,
-      text: paragraphsFor(item).join(' ')
+      text: renderInlineText(md, rawContent(item))
     }))
     .sort((a, b) => a.order - b.order));
 
@@ -75,7 +94,7 @@ module.exports = function (ec) {
       n: i + 1,
       tag: item.data.tag || null,
       attr: item.data.attr,
-      text: paragraphsFor(item).join(' ')
+      text: renderInlineText(md, rawContent(item))
     })));
 
   ec.addCollection('morgue', c => c
@@ -84,7 +103,7 @@ module.exports = function (ec) {
       num: item.data.num,
       stamp: item.data.stamp,
       title: item.data.title,
-      body: paragraphsFor(item)
+      body: renderBodyBlocks(md, rawContent(item))
     }))
     .sort((a, b) => a.num.localeCompare(b.num)));
 
@@ -94,7 +113,7 @@ module.exports = function (ec) {
       id: item.data.id,
       name: item.data.name,
       st: item.data.st,
-      desc: paragraphsFor(item).join(' ')
+      desc: renderInlineText(md, rawContent(item))
     }))
     .sort((a, b) => a.id.localeCompare(b.id)));
 

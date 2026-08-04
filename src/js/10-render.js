@@ -49,6 +49,10 @@ const PANELS = {
 
 /* ═══ RENDER — lead, flow, pinned band, ticker, morgue ═════════ */
 const leadPost = POSTS[0];
+// leadPost.body is an array of pre-rendered HTML blocks (already full tags —
+// <p>, <ul>, callouts, etc.) — split roughly in half across the two columns
+// rather than assuming exactly 4 plain paragraphs.
+const leadMid = Math.ceil(leadPost.body.length / 2);
 document.getElementById('lead-slot').innerHTML = `
  <div class="lead rv" data-tags="${leadPost.tag}" onclick="openPost('${leadPost.id}')" data-cursor="READ">
    <div class="lead-meta">
@@ -57,8 +61,8 @@ document.getElementById('lead-slot').innerHTML = `
    </div>
    <div class="lead-title" data-scr="${leadPost.title}">${leadPost.title}</div>
    <div class="lead-cols">
-     <div><p>${leadPost.body[0]}</p><p>${leadPost.body[1] || ''}</p></div>
-     <div><p>${leadPost.body[2] || ''}</p><p>${leadPost.body[3] || ''}</p></div>
+     <div>${leadPost.body.slice(0, leadMid).join('')}</div>
+     <div>${leadPost.body.slice(leadMid).join('')}</div>
    </div>
    <span class="lead-read">READ FULL ENTRY <span>→</span></span>
  </div>`;

@@ -22,14 +22,15 @@ is described here with the exact file and key to touch.
 4. [Editing guide — "I want to…"](#editing-guide--i-want-to)
 5. [`field.config.js` reference](#fieldconfigjs-reference)
 6. [Content types reference](#content-types-reference)
-7. [Design tokens & theming](#design-tokens--theming)
-8. [Publishing, routing & URLs](#publishing-routing--urls)
-9. [JS module architecture](#js-module-architecture)
-10. [Command line reference](#command-line-reference)
-11. [Spotify Now Playing](#spotify-now-playing)
-12. [Testing](#testing)
-13. [Deploy](#deploy)
-14. [Caveats](#caveats)
+7. [Markdown formatting](#markdown-formatting)
+8. [Design tokens & theming](#design-tokens--theming)
+9. [Publishing, routing & URLs](#publishing-routing--urls)
+10. [JS module architecture](#js-module-architecture)
+11. [Command line reference](#command-line-reference)
+12. [Spotify Now Playing](#spotify-now-playing)
+13. [Testing](#testing)
+14. [Deploy](#deploy)
+15. [Caveats](#caveats)
 
 ---
 
@@ -57,9 +58,12 @@ and just run `npm install` once, then the same `npm run dev`/`build`/`test`.
 | Package | Used for |
 |---|---|
 | `@11ty/eleventy` (^3.0.0) | The static site generator — collections, templating, the whole build |
-| `gray-matter` (^4.0.3) | Parses frontmatter out of content Markdown so `eleventy.config.js` can pull the raw body text for the `body:[...paragraphs]` arrays |
+| `gray-matter` (^4.0.3) | Parses frontmatter out of content Markdown so `eleventy.config.js` can pull the raw body text for markdown rendering |
 | `js-yaml` (^4.1.0) | Parses `content/photos.yml` and `content/flow.yml` |
-| `markdown-it` (^14.0.0) | Markdown → HTML for the standalone post pages (Eleventy's built-in renderer) |
+| `markdown-it` (^14.0.0) | The Markdown → HTML engine — one shared instance (`markdown.config.js`) renders both the in-page reader's body data and the standalone `/posts/…/` pages |
+| `markdown-it-mark` (^4.0.0) | `==highlight==` → `<mark>` |
+| `markdown-it-footnote` (^4.0.0) | `[^1]` reference footnotes |
+| `markdown-it-task-lists` (^2.1.1) | `- [ ]` / `- [x]` checkboxes |
 
 ### Dev-only (`devDependencies`)
 
@@ -97,6 +101,7 @@ degrades honestly offline, exactly as designed.
 ```
 field.config.js              masthead & standing info — see full reference below
 eleventy.config.js           Eleventy config: collections, filters, shortcodes
+markdown.config.js           the shared markdown-it instance — see Markdown formatting
 cli.js                       the `npx create-field-broadsheet` scaffolder
 package.json                 scripts + dependencies
 vercel.json                  tells Vercel to build with `npm run build`, serve `dist/`
@@ -156,6 +161,7 @@ dist/                         build output (gitignored) — index.html + posts/*
 | I want to… | Do this |
 |---|---|
 | Write a new dispatch | `cp src/content/posts/_template.md src/content/posts/YYYY-MM-DD-my-title.md`, fill in the frontmatter, write the body, then add a line to `src/content/flow.yml` so it appears in the dispatch column |
+| Use bold/tables/callouts/footnotes/wikilinks in a post | Just write it — see [Markdown formatting](#markdown-formatting) for the full syntax reference and the tone/type mapping for callouts |
 | Make a post the lead (top of the page) | Give it `num: "001"` — whichever post has the lowest `num` leads. Renumber the others if needed |
 | Add a travel dispatch | Set `tag: travel` and a `city:` (an IATA code from `field.config.js` → `airports`) on a post or brief — it routes to the Travel feed and that city's dossier automatically, and is *excluded* from the main dispatch flow |
 | Add a photo | Add an entry to `src/content/photos.yml`; set `city:` to link it into that city's dossier; set `src:` to a real image path, or omit it for a picsum placeholder |
@@ -207,10 +213,12 @@ Every key the site reads, in one file, grouped as they appear:
 ## Content types reference
 
 All content lives under `src/content/`. Every type has a `_template.md` to copy.
-Body text is split on **blank lines** into paragraphs — no other Markdown
-formatting is applied to it inside the in-page reader (inline HTML like
-`<strong>` is fine and passes through); the standalone post pages (`/posts/…/`)
-render the body through Eleventy's real Markdown-to-HTML pipeline instead.
+Post, morgue, and travel bodies run through a full Markdown pipeline (see
+[Markdown formatting](#markdown-formatting) below) and render identically in
+the in-page reader and the standalone `/posts/…/` pages. Brief, quote, and
+experiment bodies support the same *inline* formatting (bold, italic,
+highlight, links, wikilinks) on their single line, but not block-level things
+like lists, tables, or callouts.
 
 | Type | Frontmatter | Notes |
 |---|---|---|
@@ -221,6 +229,62 @@ render the body through Eleventy's real Markdown-to-HTML pipeline instead.
 | **experiments** (`experiments/*.md`) | `id, name, st` | `st` is `active`/`parked`/`shipped`/`live`. Body is the one-line description |
 | **photos** (`photos.yml`) | `s, src?, city?, cap` | `s` is a picsum seed used as a fallback when `src` is omitted; `cap` format is `F-### · PLACE · LAT LON` |
 | **flow** (`flow.yml`) | `{type, ref}[]` | The ordered dispatch column. `type` is `post`/`brief`/`quote`/`panel`. `ref` is a post's `id`, a brief's `order`, a quote's file order, or a panel key (`projects`/`hobbies`/`nowplaying`/`currentread`/`streak`/`bucket`/`toys`/`contact`) |
+
+---
+
+## Markdown formatting
+
+`src/content/posts/2026-08-03-a-note-on-markdown.md` is a live example of
+every feature below, rendered at `/posts/a-note-on-markdown/` and reachable
+from the in-page reader by number (`open 017` in the command line, or `#open=017`)
+— it's not wired into `flow.yml`, so it stays out of the main dispatch column
+the same way a couple of the sample posts do.
+
+One markdown-it instance (configured in `markdown.config.js`) renders every
+post/morgue body — used both for the in-page reader's data and (via
+`eleventyConfig.setLibrary('md', ...)`) the standalone pages, so a post looks
+identical in both places.
+
+| Feature | Syntax | Notes |
+|---|---|---|
+| Bold / italic / both | `**text**`, `*text*`, `***text***` | Standard |
+| Strikethrough | `~~text~~` | Standard (markdown-it core) |
+| Highlight | `==text==` | `markdown-it-mark` → `<mark>` |
+| Headings | `##`, `###`, … | Rendered at content-bucket sizes, never competing with real page headings |
+| Lists (nested, ordered/unordered) | `-`, `1.` | Standard |
+| Task lists | `- [ ]` / `- [x]` | Display-only checkboxes (not interactive — this is published content) |
+| Blockquote | `> text` | Plain quote styling — see Callouts for the `[!type]` variant |
+| Inline code / fenced code | `` `code` ``, ` ```lang ` | Fenced blocks get a `language-xxx` class on the `<code>` for optional syntax-highlighting hookup |
+| Tables | GFM pipe tables | Standard (markdown-it core) |
+| Links / images | `[text](url)`, `![alt](url)` | Standard |
+| Horizontal rule | `---` | Standard |
+| Footnotes | `text[^1]` … `[^1]: definition` | `markdown-it-footnote`. **Don't** put a footnote reference inside a callout's title line — see below |
+| Wikilinks | `[[Post Title]]`, `[[Post Title\|Display Text]]` | Custom inline rule (`markdown.config.js`), matched against every post's `title`/`id`/`slug`. Resolves to `/posts/<slug>/`; no match renders as plain dashed-underline text, mirroring Obsidian's own "unresolved link" look |
+| Callouts | `> [!note]`, `> [!tip]`, `> [!warning]`, `> [!danger]`, `> [!note]-` (collapsed), `> [!note]+` (foldable, open) | Custom source-level extraction (`markdown.config.js`), not a token-level plugin. Type maps to one of four tones reusing the site's existing status colors — see table below. Titles support inline formatting (bold/italic/wikilinks) but not footnotes (see above) |
+| Comments | `%% text %%` | Stripped entirely before rendering — never appears in either the reader or the standalone page |
+
+**Callout tone mapping** (`CALLOUT_TYPES` in `markdown.config.js` — add more
+aliases there if you want them):
+
+| Tone | Color | Obsidian types |
+|---|---|---|
+| `info` | blue `#57b0ff` | `note`, `info` |
+| `warn` | amber `#e8a33d` | `warning`, `caution`, `attention`, `todo` |
+| `danger` | red `#ff5c57` | `danger`, `error`, `failure`, `fail`, `missing`, `bug` |
+| `acc` (default) | acid green | `tip`, `hint`, `important`, `success`, `check`, `done`, `question`, `help`, `faq`, `example`, and anything unrecognized |
+| `dim` | neutral/italic | `abstract`, `summary`, `tldr`, `quote`, `cite` |
+
+**Deliberately not implemented** — both are genuine Obsidian features, left out
+for reasons specific to a public website rather than oversight:
+- **Obsidian URIs** (`obsidian://...`) — only resolve if the visitor has
+  Obsidian installed with this vault open locally; meaningless for a website.
+- **Inline footnotes** (`^[text]`) — no established markdown-it plugin for this
+  Obsidian-only variant. Use standard reference footnotes (`[^1]` / `[^1]: …`)
+  instead; they cover the same need.
+
+If you add a new markdown-it plugin, register it in `createMarkdownIt()` in
+`markdown.config.js` — that one instance feeds both render paths, so nothing
+else needs to change.
 
 ---
 

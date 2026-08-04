@@ -19,7 +19,7 @@ const CMDS = {
       if (q.length < 2) { cmdOut('err', 'search <term> — min 2 chars'); return; }
       let hits = 0;
       POSTS.forEach(pp => {
-        const hay = (pp.title + ' ' + pp.excerpt + ' ' + pp.body.join(' ')).toLowerCase();
+        const hay = (pp.title + ' ' + pp.excerpt + ' ' + pp.body.join(' ').replace(/<[^>]+>/g, ' ')).toLowerCase();
         if (hay.includes(q)) {
           hits++;
           const d = document.createElement('div');
@@ -30,7 +30,7 @@ const CMDS = {
         }
       });
       MORGUE.forEach((m, i) => {
-        const hay = (m.title + ' ' + m.body.join(' ')).toLowerCase();
+        const hay = (m.title + ' ' + m.body.join(' ').replace(/<[^>]+>/g, ' ')).toLowerCase();
         if (hay.includes(q)) {
           hits++;
           const d = document.createElement('div');
