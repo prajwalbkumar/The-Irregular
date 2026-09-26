@@ -59,7 +59,7 @@ and just run `npm install` once, then the same `npm run dev`/`build`/`test`.
 |---|---|
 | `@11ty/eleventy` (^3.0.0) | The static site generator — collections, templating, the whole build |
 | `gray-matter` (^4.0.3) | Parses frontmatter out of content Markdown so `eleventy.config.js` can pull the raw body text for markdown rendering |
-| `js-yaml` (^4.1.0) | Parses `content/photos.yml` and `content/flow.yml` |
+| `js-yaml` (^4.1.0) | Parses `content/photos.yml` |
 | `markdown-it` (^14.0.0) | The Markdown → HTML engine — one shared instance (`markdown.config.js`) renders both the in-page reader's body data and the standalone `/posts/…/` pages |
 | `markdown-it-mark` (^4.0.0) | `==highlight==` → `<mark>` |
 | `markdown-it-footnote` (^4.0.0) | `[^1]` reference footnotes |
@@ -120,15 +120,14 @@ src/
   _data/
     config.js                exposes field.config.js as `config` in templates
     photos.js                loads + resolves content/photos.yml (real src or picsum fallback)
-    flow.js                  loads content/flow.yml
     homeCode.js              derives the home airport's IATA code from field.config.js
     sameAs.js                non-empty social links, for the Person JSON-LD
   css/
     field.css                the stylesheet — ported verbatim from the prototype
   js/                        client-side modules, concatenated into ONE inline <script>
                              by the `fieldJS` shortcode, in this exact load order:
-    10-render.js             lead/flow/pinned-panels/ticker/travel-feed/photo-grid/
-                             experiments/CV/morgue render + status clock/temp
+    10-render.js             lead/flow (computed order + Load More)/pinned-panels/ticker/
+                             travel-feed/photo-grid/experiments/CV/morgue render + status clock/temp
     20-cursor.js             CAD cursor, osnap engine, crosshair, construction lines
     40-globe.js              globe.gl init, flight math, city dossiers, legend chips
     50-activity.js           GitHub activity fetch (cached)
@@ -137,13 +136,12 @@ src/
     80-fx.js                 reveal-on-scroll, panel tilt, nav, boot gate, scrollspy, WIRE quote
     90-panels.js             now-playing / reading / streak panel fills
   content/                   ← you write here (see Content types reference)
-    posts/*.md                dispatches (16 sample entries + _template.md)
+    posts/*.md                dispatches (23 sample entries + _template.md)
     briefs/*.md                short-form briefs (8 + _template.md)
     quotes/*.md                 pull-quotes (3 + _template.md)
     morgue/*.md                killed drafts (3 + _template.md)
     experiments/*.md            the log rows in §04 (7 + _template.md)
     photos.yml                  the contact-strip / photography manifest
-    flow.yml                    the ordered dispatch column — posts/briefs/quotes/panels
     posts.json, briefs.json, … directory data files (permalinks, layouts — see below)
   sitemap.njk                 → /sitemap.xml
   robots.njk                  → /robots.txt
@@ -163,7 +161,7 @@ dist/                         build output (gitignored) — index.html + posts/*
 
 | I want to… | Do this |
 |---|---|
-| Write a new dispatch | `cp src/content/posts/_template.md src/content/posts/YYYY-MM-DD-my-title.md`, fill in the frontmatter, write the body, then add a line to `src/content/flow.yml` so it appears in the dispatch column |
+| Write a new dispatch | `cp src/content/posts/_template.md src/content/posts/YYYY-MM-DD-my-title.md`, fill in the frontmatter, write the body. It appears in the dispatch column automatically — see [Dispatch ordering & Load More](#dispatch-ordering--load-more) |
 | Use bold/tables/callouts/footnotes/wikilinks in a post | Just write it — see [Markdown formatting](#markdown-formatting) for the full syntax reference and the tone/type mapping for callouts |
 | Make a post the lead (top of the page) | Give it `num: "001"` — whichever post has the lowest `num` leads. Renumber the others if needed |
 | Add a travel dispatch | Set `tag: travel` and a `city:` (an IATA code from `field.config.js` → `airports`) on a post or brief — it routes to the Travel feed and that city's dossier automatically, and is *excluded* from the main dispatch flow |
@@ -175,7 +173,7 @@ dist/                         build output (gitignored) — index.html + posts/*
 | Update your CV / experience / skills | `field.config.js` → `cv` (blurb, experience, education, specializations, skills, testimonial) |
 | Update a panel (Now Playing, Reading, Challenge, Bucket List, Toys, Projects) | The matching key in `field.config.js` (`nowPlaying`, `reading`, `challenge`, `bucket`, `toys`, `projects`) |
 | Change the About/Now pinned panels | `field.config.js` → `about` / `now` (HTML strings — `<span class="fg">…</span>` for the brighter inline color) |
-| Reorder the dispatch column | Edit `src/content/flow.yml` — it's read top to bottom |
+| Change how the dispatch column is ordered/paginated | Edit the constants at the top of the flow section in `src/js/10-render.js` (`FLOW_PANEL_KEYS`, `FLOW_PAGE_SIZE`) — see [Dispatch ordering & Load More](#dispatch-ordering--load-more) |
 | Retire a post without deleting it | Move it into `src/content/morgue/` with a `stamp` of `UNPUBLISHED`/`ABANDONED`/`UNFINISHED` |
 | Log a new experiment | Add a file to `src/content/experiments/` |
 | Change the site's SEO title/description/domain | `field.config.js` → `site` (title, tagline, description, url — `url` feeds canonical links, the sitemap, and JSON-LD, so set it before deploying) |
@@ -225,13 +223,35 @@ like lists, tables, or callouts.
 
 | Type | Frontmatter | Notes |
 |---|---|---|
-| **posts** (`posts/*.md`) | `id, num, tag, city?, date, size, title, excerpt` | `num` is fixed forever (deep-link stability). `tag: travel` + a `city` routes to the Travel feed instead of the main flow. `size` is `lg`/`md`/`sm` (title scale in the flow). Lowest `num` = lead post. Also builds a standalone page at `/posts/<slug>/` |
-| **briefs** (`briefs/*.md`) | `tag, city?, order` | `order` is the 1-based position referenced from `flow.yml`. Label ("CODE · BRIEF") is derived from `tag`, not authored |
-| **quotes** (`quotes/*.md`) | `attr, tag?` | Referenced from `flow.yml` by file order (1-based) |
+| **posts** (`posts/*.md`) | `id, num, tag, city?, date, size, title, excerpt` | `num` is fixed forever (deep-link stability). `tag: travel` + a `city` routes to the Travel feed instead of the main flow. `size` is `lg`/`md`/`sm` (title scale in the flow). Lowest `num` = lead post. `date` drives the dispatch column's reverse-chronological order (see below). Also builds a standalone page at `/posts/<slug>/` |
+| **briefs** (`briefs/*.md`) | `tag, city?, order` | `order` sets the cycle position briefs are drawn from when the flow interleaves them (see below). Label ("CODE · BRIEF") is derived from `tag`, not authored |
+| **quotes** (`quotes/*.md`) | `attr, tag?` | Drawn into the flow by file order (1-based) as part of the same interleave cycle |
 | **morgue** (`morgue/*.md`) | `num, stamp, title` | `stamp` is `UNPUBLISHED`/`ABANDONED`/`UNFINISHED`. Morgue entries never get standalone pages and are excluded from the sitemap |
 | **experiments** (`experiments/*.md`) | `id, name, st` | `st` is `active`/`parked`/`shipped`/`live`. Body is the one-line description |
 | **photos** (`photos.yml`) | `s, src?, city?, cap` | `s` is a picsum seed used as a fallback when `src` is omitted; `cap` format is `F-### · PLACE · LAT LON` |
-| **flow** (`flow.yml`) | `{type, ref}[]` | The ordered dispatch column. `type` is `post`/`brief`/`quote`/`panel`. `ref` is a post's `id`, a brief's `order`, a quote's file order, or a panel key (`projects`/`hobbies`/`nowplaying`/`currentread`/`streak`/`bucket`/`toys`/`contact`) |
+
+### Dispatch ordering & Load More
+
+There is no authored position list — every non-travel, non-lead post appears
+in the dispatch column (§01) automatically, computed in `src/js/10-render.js`:
+
+1. **Order.** Posts are filtered (lead post + `tag: travel` posts excluded —
+   they render in `#lead-slot` and the Travel feed instead) and sorted by
+   `date`, newest first.
+2. **Interleave.** Every third post, one "extra" is woven in — a brief, a
+   quote, or a panel, cycling through those three kinds in turn — pulling
+   round-robin from the non-travel briefs (by `order`), the quotes (by file
+   order), and a fixed list of panel keys. This keeps the column's newspaper
+   variety without anyone hand-placing each block; add more briefs/quotes any
+   time and the cycle picks them up automatically.
+3. **Paginate.** The computed list (`FLOW_ITEMS`) is revealed a page at a
+   time (`FLOW_PAGE_SIZE`, currently 9 items) — the rest of the archive is
+   there, it just isn't dumped on first paint. Clicking **Load More** appends
+   the next page in place (no navigation, no reload); the button hides itself
+   once every item has been shown.
+
+To change the cadence, edit `FLOW_PANEL_KEYS` / `FLOW_PAGE_SIZE` at the top of
+the flow section in `10-render.js` — nothing else needs to change.
 
 ---
 
@@ -239,9 +259,10 @@ like lists, tables, or callouts.
 
 `src/content/posts/2026-08-03-a-note-on-markdown.md` is a live example of
 every feature below, rendered at `/posts/a-note-on-markdown/` and reachable
-from the in-page reader by number (`open 017` in the command line, or `#open=017`)
-— it's not wired into `flow.yml`, so it stays out of the main dispatch column
-the same way a couple of the sample posts do.
+from the in-page reader by number (`open 017` in the command line, or `#open=017`).
+Like every non-travel, non-lead post, it also appears in the main dispatch
+column in its correct chronological position — see
+[Dispatch ordering & Load More](#dispatch-ordering--load-more).
 
 One markdown-it instance (configured in `markdown.config.js`) renders every
 post/morgue body — used both for the in-page reader's data and (via

@@ -196,6 +196,11 @@ body.cursor-on #cur-dot,body.cursor-on #cur-ring,body.cursor-on #cur-coords{disp
   display:inline-block;width:100%;vertical-align:top;
   margin:0 0 1.4rem;
 }
+.flow-more-row{
+  display:flex;align-items:center;gap:1rem;
+  margin-top:.4rem;padding-top:1.2rem;border-top:1px solid var(--line);
+}
+.flow-more-ind{font-family:var(--mono);font-size:.52rem;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
 
 /* Story */
 .story{

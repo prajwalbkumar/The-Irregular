@@ -98,6 +98,10 @@
     <span class="sec-meta">RANDOM THOUGHTS · LAID OUT</span>
   </h2>
   <div class="flow" id="flow"></div>
+  <div class="flow-more-row" id="flow-more-row" hidden>
+    <button class="mt-btn" id="flow-more" data-cursor="PAGE">Load More Dispatches</button>
+    <span class="flow-more-ind" id="flow-more-ind"></span>
+  </div>
 
   <!-- FIELD LOG — TRAVEL TERRITORY -->
   <h2 class="sec-head rv" id="sec-travel">
@@ -233,7 +237,6 @@ const QUOTES = {{ collections.quotes | dump | safe }};
 const MORGUE = {{ collections.morgue | dump | safe }};
 const EXPS = {{ collections.experiments | dump | safe }};
 const PHOTOS = {{ photos | dump | safe }};
-const FLOW = {{ flow | dump | safe }};
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FINE_PTR = matchMedia('(hover: hover) and (pointer: fine)').matches;
 

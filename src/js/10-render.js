@@ -67,38 +67,94 @@ document.getElementById('lead-slot').innerHTML = `
    <span class="lead-read">READ FULL ENTRY <span>→</span></span>
  </div>`;
 
-let flowHTML = '';
-FLOW.forEach((f, fi) => {
+/* ═══ DISPATCH FLOW — computed order, no authored position list ═══
+   The lead post and travel-tagged posts are pulled out (they render
+   elsewhere); everything left is sorted reverse-chronological. Briefs/
+   quotes/panels are woven in at a fixed cadence — one "extra" every
+   three posts, cycling brief → quote → panel — so the column keeps its
+   newspaper variety without anyone hand-placing each block. Revealed a
+   page at a time via Load More so the column never dumps the whole
+   archive on first paint. */
+const FLOW_PANEL_KEYS = ['projects', 'hobbies', 'nowplaying', 'currentread', 'streak', 'bucket', 'toys', 'contact'];
+const FLOW_PAGE_SIZE = 9;
+
+const flowPosts = POSTS.filter(p => p.id !== leadPost.id && p.tag !== 'travel')
+  .sort((a, b) => b.date.localeCompare(a.date));
+const flowBriefs = BRIEFS.filter(b => b.tag !== 'travel').sort((a, b) => a.order - b.order);
+const flowQuotes = QUOTES.slice();
+
+const FLOW_ITEMS = (() => {
+  const items = [];
+  let extraI = 0, briefI = 0, quoteI = 0, panelI = 0;
+  flowPosts.forEach((p, i) => {
+    items.push({ type: 'post', data: p });
+    const canExtra = flowBriefs.length || flowQuotes.length || FLOW_PANEL_KEYS.length;
+    if ((i + 1) % 3 === 0 && canExtra) {
+      const kind = extraI % 3;
+      if (kind === 0 && flowBriefs.length) items.push({ type: 'brief', data: flowBriefs[briefI++ % flowBriefs.length] });
+      else if (kind === 1 && flowQuotes.length) items.push({ type: 'quote', data: flowQuotes[quoteI++ % flowQuotes.length] });
+      else items.push({ type: 'panel', data: FLOW_PANEL_KEYS[panelI++ % FLOW_PANEL_KEYS.length] });
+      extraI++;
+    }
+  });
+  return items;
+})();
+window.FLOW_ITEMS = FLOW_ITEMS; /* test hook — see test/suite.js */
+
+function renderFlowItem(item, fi) {
   const delay = `style="transition-delay:${(fi % 6) * 50}ms"`;
-  if (f.type === 'post') {
-    const p = POSTS.find(x => x.id === f.ref);
-    flowHTML += `
+  if (item.type === 'post') {
+    const p = item.data;
+    return `
     <div class="story rv" ${delay} data-tags="${p.tag}" onclick="openPost('${p.id}')" data-cursor="READ">
       <div class="st-meta"><span class="st-num">${p.num}</span><span>${p.date}</span></div>
       <div class="st-title t-${p.size}" data-scr="${p.title.replace(/"/g, '&quot;')}">${p.title}</div>
       <div class="st-ex">${p.excerpt}</div>
       <span class="st-tag">${p.tag}</span>
     </div>`;
-  } else if (f.type === 'brief') {
-    const b = BRIEFS.find(x => x.order === f.ref);
-    flowHTML += `
+  }
+  if (item.type === 'brief') {
+    const b = item.data;
+    return `
     <div class="brief rv" ${delay} data-tags="${b.tag}">
       <div class="br-label">${b.label}</div>
       <div class="br-text">${b.text}</div>
     </div>`;
-  } else if (f.type === 'quote') {
-    const q = QUOTES.find(x => x.n === f.ref);
-    flowHTML += `
+  }
+  if (item.type === 'quote') {
+    const q = item.data;
+    return `
     <div class="quote rv" ${delay} data-tags="${q.tag}">
       <div class="q-mark">// QUOTED</div>
       <div class="q-text">${q.text}</div>
       <div class="q-attr">${q.attr}</div>
     </div>`;
-  } else if (f.type === 'panel') {
-    flowHTML += `<div class="panel rv tilt" ${delay} data-panel="${f.ref}"><span class="p-h2"></span><span class="p-h4"></span>${PANELS[f.ref]}</div>`;
   }
-});
-document.getElementById('flow').innerHTML = flowHTML;
+  return `<div class="panel rv tilt" ${delay} data-panel="${item.data}"><span class="p-h2"></span><span class="p-h4"></span>${PANELS[item.data]}</div>`;
+}
+
+let flowShown = 0;
+function renderFlowPage() {
+  const flowEl = document.getElementById('flow');
+  const batch = FLOW_ITEMS.slice(flowShown, flowShown + FLOW_PAGE_SIZE);
+  flowEl.insertAdjacentHTML('beforeend', batch.map((it, i) => renderFlowItem(it, flowShown + i)).join(''));
+  batch.forEach((_, i) => {
+    const el = flowEl.children[flowShown + i];
+    // rvIO (80-fx.js) isn't declared yet on the very first call — its own
+    // top-level scan picks up this initial batch a few lines later. Once
+    // it exists, Load More clicks need to register new cards with it
+    // themselves, since that scan only ever runs once.
+    if (!el) return;
+    try { rvIO.observe(el); } catch (e) {}
+  });
+  flowShown += batch.length;
+  const row = document.getElementById('flow-more-row'), ind = document.getElementById('flow-more-ind');
+  const done = flowShown >= FLOW_ITEMS.length;
+  if (row) row.hidden = done;
+  if (ind) ind.textContent = `SHOWING ${flowShown} OF ${FLOW_ITEMS.length}`;
+}
+renderFlowPage();
+document.getElementById('flow-more')?.addEventListener('click', renderFlowPage);
 
 /* Pinned identity band — About + Now, full width */
 document.getElementById('pinned-panels').innerHTML = ['about', 'now'].map(k =>

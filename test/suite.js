@@ -5,11 +5,13 @@
  * everything the built page reaches for that jsdom doesn't implement; then
  * asserts zero window errors plus the behavioral checklist.
  *
- * Note: data arrays (POSTS/FLOW/EXPS/MORGUE/CMDS/...) are declared `const`
- * inside the page's own inline script — only `function` declarations become
- * window properties in a classic script, so `window.FLOW` etc. don't exist
- * from outside. Where a count is needed, we extract the same JSON literal
- * straight out of the built HTML instead of reaching into the page.
+ * Note: data arrays (POSTS/EXPS/MORGUE/CMDS/...) are declared `const` inside
+ * the page's own inline script — only `function` declarations (and explicit
+ * `window.x = ...` assignments) become window properties in a classic
+ * script, so most of these don't exist from outside. Where a count is
+ * needed, we either extract the same JSON literal straight out of the built
+ * HTML, or reach for a value 10-render.js deliberately hangs off `window`
+ * as a test hook (window.FLOW_ITEMS).
  */
 const fs = require('fs');
 const path = require('path');
@@ -28,7 +30,6 @@ function extractConst(name) {
   if (!m) throw new Error(`could not find "const ${name} = ...;" in built HTML`);
   return JSON.parse(m[1]);
 }
-const DATA_FLOW = extractConst('FLOW');
 const DATA_EXPS = extractConst('EXPS');
 const DATA_MORGUE = extractConst('MORGUE');
 
@@ -89,12 +90,46 @@ function main() {
   });
 
   // ── renders ──
-  section('renders: flow', () => {
+  // FLOW_ITEMS (10-render.js) is computed at runtime — no authored position
+  // list exists anymore — so it's exposed on window purely as a test hook.
+  const FLOW_PAGE_SIZE = 9; // must match FLOW_PAGE_SIZE in src/js/10-render.js
+  section('renders: flow — computed order', () => {
     const flowEl = d.getElementById('flow');
     assert(!!flowEl, 'flow container exists');
+    const items = window.FLOW_ITEMS;
+    assert(Array.isArray(items) && items.length > 0, 'FLOW_ITEMS is computed (posts sorted + briefs/quotes/panels interleaved)');
+    const expectedInitial = Math.min(FLOW_PAGE_SIZE, items.length);
     // +1: 80-fx.js's mountWire() inserts one extra live quote card into #flow
-    assert(flowEl.children.length === DATA_FLOW.length + 1, `flow renders ${DATA_FLOW.length} authored items + 1 WIRE card, got ${flowEl.children.length}`);
-    assert(d.querySelectorAll('#flow .quote').length === 4, `expected 3 authored quotes + 1 WIRE quote = 4, got ${d.querySelectorAll('#flow .quote').length}`);
+    assert(flowEl.children.length === expectedInitial + 1, `flow renders the first ${expectedInitial} computed items + 1 WIRE card, got ${flowEl.children.length}`);
+    const posts = items.filter(it => it.type === 'post').map(it => it.data);
+    const sorted = [...posts].sort((a, b) => b.date.localeCompare(a.date));
+    assert(posts.every((p, i) => p.id === sorted[i].id), 'flow posts are ordered reverse-chronologically, newest first');
+    assert(!posts.some(p => p.id === 'p01'), 'the lead post is excluded from the flow pool (it renders in #lead-slot)');
+    assert(!posts.some(p => p.tag === 'travel'), 'travel-tagged posts are excluded from the flow pool (they route to the Travel feed)');
+    assert(d.querySelectorAll('#flow .quote').length >= 1, 'at least the WIRE quote card is present in the flow');
+  });
+  section('renders: flow — Load More pagination', () => {
+    const flowEl = d.getElementById('flow');
+    const row = d.getElementById('flow-more-row');
+    const btn = d.getElementById('flow-more');
+    const items = window.FLOW_ITEMS;
+    assert(!!row && !!btn, 'Load More control exists');
+    if (items.length <= FLOW_PAGE_SIZE) {
+      assert(row.hidden, 'Load More stays hidden when every item already fits on the first page');
+      return;
+    }
+    assert(!row.hidden, 'Load More is visible when more items remain beyond the first page');
+    const before = flowEl.children.length;
+    btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    const after = flowEl.children.length;
+    assert(after > before, `clicking Load More appends more items to #flow (${before} → ${after})`);
+    let guard = 0;
+    while (!row.hidden && guard < 20) {
+      btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      guard++;
+    }
+    assert(row.hidden, 'Load More hides itself once every computed item has been revealed');
+    assert(flowEl.children.length === items.length + 1, `after exhausting Load More, #flow holds every computed item + the WIRE card (expected ${items.length + 1}, got ${flowEl.children.length})`);
   });
   section('renders: pinned panels', () => {
     assert(d.getElementById('pinned-panels').children.length === 2, 'pinned band has exactly 2 panels (about, now)');
