@@ -5,5 +5,12 @@
     "description": "Beautiful, modern publishing with email newsletters and paid subscriptions built-in. Used by Platformer, 404Media, Lever News, Tangle, The Browser, and thousands more.",
     "image": "https://ghost.org/images/meta/ghost-6.png",
     "siteName": "Ghost - The Professional Publishing Platform"
+  },
+  "https://www.youtube.com/watch?v=0af00UcTO-c&t=543s": {
+    "url": "https://www.youtube.com/watch?v=0af00UcTO-c&t=543s",
+    "title": "Where good ideas come from | Steven Johnson",
+    "description": "http://www.ted.com People often credit their ideas to individual \"Eureka!\" moments. But Steven Johnson shows how history tells a different story. His fascina...",
+    "image": "https://i.ytimg.com/vi/0af00UcTO-c/hqdefault.jpg?sqp=-oaymwEmCOADEOgC8quKqQMa8AEB-AHQBoAC4AOKAgwIABABGBMgJSh_MA8=&amp;rs=AOn4CLBADMNneMchjmFBE-DFOkRyclw42w",
+    "siteName": "YouTube"
   }
 }
