@@ -98,9 +98,14 @@ function main() {
     assert(!!flowEl, 'flow container exists');
     const items = window.FLOW_ITEMS;
     assert(Array.isArray(items) && items.length > 0, 'FLOW_ITEMS is computed (posts sorted + briefs/quotes/panels interleaved)');
-    const expectedInitial = Math.min(FLOW_PAGE_SIZE, items.length);
+    const posts0 = items.filter(it => it.type === 'post');
+    assert(posts0.length === Math.min(FLOW_PAGE_SIZE, window.__flowPostTotal), `first page shows ${FLOW_PAGE_SIZE} posts, got ${posts0.length}`);
     // +1: 80-fx.js's mountWire() inserts one extra live quote card into #flow
-    assert(flowEl.children.length === expectedInitial + 1, `flow renders the first ${expectedInitial} computed items + 1 WIRE card, got ${flowEl.children.length}`);
+    assert(flowEl.children.length === items.length + 1, `flow renders every current item + 1 WIRE card, got ${flowEl.children.length}`);
+    ['projects', 'hobbies', 'nowplaying', 'currentread', 'streak', 'bucket', 'toys', 'contact'].forEach(k =>
+      assert(!!flowEl.querySelector(`[data-panel="${k}"]`), `special panel "${k}" is on the page before any Load More click`));
+    assert(flowEl.querySelectorAll('.brief').length === window.__flowBriefTotal, 'every brief is on the page before any Load More click');
+    assert(flowEl.querySelectorAll('.quote:not(.wire)').length === window.__flowQuoteTotal, 'every authored quote is on the page before any Load More click');
     const posts = items.filter(it => it.type === 'post').map(it => it.data);
     const sorted = [...posts].sort((a, b) => b.date.localeCompare(a.date));
     assert(posts.every((p, i) => p.id === sorted[i].id), 'flow posts are ordered reverse-chronologically, newest first');
@@ -112,24 +117,30 @@ function main() {
     const flowEl = d.getElementById('flow');
     const row = d.getElementById('flow-more-row');
     const btn = d.getElementById('flow-more');
-    const items = window.FLOW_ITEMS;
     assert(!!row && !!btn, 'Load More control exists');
-    if (items.length <= FLOW_PAGE_SIZE) {
-      assert(row.hidden, 'Load More stays hidden when every item already fits on the first page');
+    if (window.__flowPostTotal <= FLOW_PAGE_SIZE) {
+      assert(row.hidden, 'Load More stays hidden when every post already fits on the first page');
       return;
     }
-    assert(!row.hidden, 'Load More is visible when more items remain beyond the first page');
-    const before = flowEl.children.length;
+    assert(!row.hidden, 'Load More is visible when more posts remain beyond the first page');
+    const specialsBefore = flowEl.children.length - d.querySelectorAll('#flow .story').length;
+    const np = d.getElementById('np-title');
+    const before = d.querySelectorAll('#flow .story').length;
     btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    const after = flowEl.children.length;
-    assert(after > before, `clicking Load More appends more items to #flow (${before} → ${after})`);
+    const after = d.querySelectorAll('#flow .story').length;
+    assert(after > before, `clicking Load More adds posts to #flow (${before} → ${after})`);
+    assert(flowEl.children.length - after === specialsBefore, 'Load More adds no special cards and drops none — all specials stay on the page');
+    assert(d.getElementById('np-title') === np, 'special cards are moved, not rebuilt, on Load More');
     let guard = 0;
     while (!row.hidden && guard < 20) {
       btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
       guard++;
     }
-    assert(row.hidden, 'Load More hides itself once every computed item has been revealed');
-    assert(flowEl.children.length === items.length + 1, `after exhausting Load More, #flow holds every computed item + the WIRE card (expected ${items.length + 1}, got ${flowEl.children.length})`);
+    assert(row.hidden, 'Load More hides itself once every post has been revealed');
+    assert(flowEl.children.length === window.FLOW_ITEMS.length + 1, `after exhausting Load More, #flow holds every item + the WIRE card (expected ${window.FLOW_ITEMS.length + 1}, got ${flowEl.children.length})`);
+    const kinds = window.FLOW_ITEMS.map(it => it.type);
+    const lastPost = kinds.lastIndexOf('post');
+    assert(kinds.slice(0, lastPost).filter(k => k !== 'post').length >= window.__flowSpecialTotal - 1, 'specials are spread among the posts, not piled at the end');
   });
   section('renders: pinned panels', () => {
     assert(d.getElementById('pinned-panels').children.length === 2, 'pinned band has exactly 2 panels (about, now)');

@@ -68,13 +68,12 @@ document.getElementById('lead-slot').innerHTML = `
  </div>`;
 
 /* ═══ DISPATCH FLOW — computed order, no authored position list ═══
-   The lead post and travel-tagged posts are pulled out (they render
-   elsewhere); everything left is sorted reverse-chronological. Briefs/
-   quotes/panels are woven in at a fixed cadence — one "extra" every
-   three posts, cycling brief → quote → panel — so the column keeps its
-   newspaper variety without anyone hand-placing each block. Revealed a
-   page at a time via Load More so the column never dumps the whole
-   archive on first paint. */
+   Two kinds of card. POSTS are paginated: the lead post and travel-tagged
+   posts are pulled out (they render elsewhere), the rest are sorted
+   reverse-chronological and revealed a page at a time via Load More.
+   SPECIAL cards (panels, quotes, briefs) are never paginated — every one is
+   always on the page, spread evenly between whichever posts are currently
+   showing, so Load More re-distributes them over the longer column. */
 const FLOW_PANEL_KEYS = ['projects', 'hobbies', 'nowplaying', 'currentread', 'streak', 'bucket', 'toys', 'contact'];
 const FLOW_PAGE_SIZE = 9;
 
@@ -83,23 +82,35 @@ const flowPosts = POSTS.filter(p => p.id !== leadPost.id && p.tag !== 'travel')
 const flowBriefs = BRIEFS.filter(b => b.tag !== 'travel').sort((a, b) => a.order - b.order);
 const flowQuotes = QUOTES.slice();
 
-const FLOW_ITEMS = (() => {
-  const items = [];
-  let extraI = 0, briefI = 0, quoteI = 0, panelI = 0;
-  flowPosts.forEach((p, i) => {
-    items.push({ type: 'post', data: p });
-    const canExtra = flowBriefs.length || flowQuotes.length || FLOW_PANEL_KEYS.length;
-    if ((i + 1) % 3 === 0 && canExtra) {
-      const kind = extraI % 3;
-      if (kind === 0 && flowBriefs.length) items.push({ type: 'brief', data: flowBriefs[briefI++ % flowBriefs.length] });
-      else if (kind === 1 && flowQuotes.length) items.push({ type: 'quote', data: flowQuotes[quoteI++ % flowQuotes.length] });
-      else items.push({ type: 'panel', data: FLOW_PANEL_KEYS[panelI++ % FLOW_PANEL_KEYS.length] });
-      extraI++;
-    }
-  });
-  return items;
+/* Specials in a fixed round-robin order (panels lead; each placed once). */
+const FLOW_SPECIALS = (() => {
+  const pools = [
+    FLOW_PANEL_KEYS.map(data => ({ type: 'panel', data })),
+    flowQuotes.map(data => ({ type: 'quote', data })),
+    flowBriefs.map(data => ({ type: 'brief', data }))
+  ];
+  const pattern = [0, 1, 0, 2];
+  const out = [];
+  for (let k = 0; pools.some(p => p.length); k++) {
+    const pool = pools[pattern[k % pattern.length]];
+    if (pool.length) out.push(pool.shift());
+  }
+  return out;
 })();
-window.FLOW_ITEMS = FLOW_ITEMS; /* test hook — see test/suite.js */
+
+/* The first `n` posts with every special card spread evenly between them. */
+function buildFlowItems(n) {
+  const posts = flowPosts.slice(0, n);
+  const items = [];
+  let placed = 0;
+  posts.forEach((p, i) => {
+    items.push({ type: 'post', data: p });
+    const due = Math.round((i + 1) * FLOW_SPECIALS.length / posts.length);
+    while (placed < due) items.push(FLOW_SPECIALS[placed++]);
+  });
+  while (placed < FLOW_SPECIALS.length) items.push(FLOW_SPECIALS[placed++]);
+  return items;
+}
 
 function renderFlowItem(item, fi) {
   const delay = `style="transition-delay:${(fi % 6) * 50}ms"`;
@@ -133,25 +144,39 @@ function renderFlowItem(item, fi) {
   return `<div class="panel rv tilt" ${delay} data-panel="${item.data}"><span class="p-h2"></span><span class="p-h4"></span>${PANELS[item.data]}</div>`;
 }
 
-let flowShown = 0;
+window.__flowPostTotal = flowPosts.length; window.__flowBriefTotal = flowBriefs.length; /* test hooks */
+window.__flowQuoteTotal = flowQuotes.length; window.__flowSpecialTotal = FLOW_SPECIALS.length;
+let flowPostsShown = 0;
+const flowEls = new Map(); /* item.data → its DOM node, so Load More re-orders live cards instead of rebuilding them */
 function renderFlowPage() {
   const flowEl = document.getElementById('flow');
-  const batch = FLOW_ITEMS.slice(flowShown, flowShown + FLOW_PAGE_SIZE);
-  flowEl.insertAdjacentHTML('beforeend', batch.map((it, i) => renderFlowItem(it, flowShown + i)).join(''));
-  batch.forEach((_, i) => {
-    const el = flowEl.children[flowShown + i];
-    // rvIO (80-fx.js) isn't declared yet on the very first call — its own
-    // top-level scan picks up this initial batch a few lines later. Once
-    // it exists, Load More clicks need to register new cards with it
-    // themselves, since that scan only ever runs once.
-    if (!el) return;
-    try { rvIO.observe(el); } catch (e) {}
+  const wire = flowEl.querySelector('.quote.wire'); /* live card mounted by 80-fx.js */
+  flowPostsShown = Math.min(flowPostsShown + FLOW_PAGE_SIZE, flowPosts.length);
+  const items = buildFlowItems(flowPostsShown);
+  window.FLOW_ITEMS = items; /* test hook — see test/suite.js */
+  const fresh = [];
+  const nodes = items.map((it, i) => {
+    let el = flowEls.get(it.data);
+    if (!el) {
+      const t = document.createElement('template');
+      t.innerHTML = renderFlowItem(it, i).trim();
+      el = t.content.firstElementChild;
+      flowEls.set(it.data, el);
+      fresh.push(el);
+    }
+    return el;
   });
-  flowShown += batch.length;
+  /* Panels fill themselves in after render (Now Playing, streak…), so existing
+     nodes are moved, never recreated. Re-appending in order does the re-spread. */
+  nodes.forEach(el => flowEl.appendChild(el));
+  if (wire) flowEl.insertBefore(wire, flowEl.children[Math.min(6, flowEl.children.length)]);
+  /* rvIO (80-fx.js) isn't declared yet on the very first call — its own
+     top-level scan picks up that initial batch a few lines later. */
+  fresh.forEach(el => { try { rvIO.observe(el); } catch (e) {} });
   const row = document.getElementById('flow-more-row'), ind = document.getElementById('flow-more-ind');
-  const done = flowShown >= FLOW_ITEMS.length;
+  const done = flowPostsShown >= flowPosts.length;
   if (row) row.hidden = done;
-  if (ind) ind.textContent = `SHOWING ${flowShown} OF ${FLOW_ITEMS.length}`;
+  if (ind) ind.textContent = `SHOWING ${flowPostsShown} OF ${flowPosts.length} DISPATCHES`;
 }
 renderFlowPage();
 document.getElementById('flow-more')?.addEventListener('click', renderFlowPage);

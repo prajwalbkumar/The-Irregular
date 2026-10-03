@@ -124,7 +124,7 @@ async function pullWire() {
 (function mountWire() {
   const flow = document.getElementById('flow');
   const d = document.createElement('div');
-  d.className = 'quote rv in'; d.setAttribute('data-tags', 'opinion');
+  d.className = 'quote wire rv in'; d.setAttribute('data-tags', 'opinion');
   d.innerHTML = `<div class="q-mark">// QUOTED · WIRE</div>
     <div class="q-text" id="wire-q" style="transition:opacity .3s">—</div>
     <div class="q-attr" id="wire-a">TUNING…</div>
